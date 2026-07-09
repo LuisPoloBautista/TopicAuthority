@@ -2,13 +2,13 @@
   "topic": "Botánica mexicana del siglo XVIII",
   "authorities": [
     {
-      "source": "BNE",
-      "label": "Botánica",
-      "term": "Botánica",
-      "url": "https://datos.bne.es/resource/XX...",
-      "uri": "https://datos.bne.es/resource/XX...",
-      "type": "Materia",
-      "description": "",
+      "source": "VIAF",
+      "label": "Ejemplo de autoridad VIAF",
+      "term": "Ejemplo de autoridad VIAF",
+      "url": "https://viaf.org/viaf/...",
+      "uri": "https://viaf.org/viaf/...",
+      "type": "Autoridad",
+      "description": "Fuentes enlazadas cuando VIAF las devuelve",
       "match": "partial"
     },
     {

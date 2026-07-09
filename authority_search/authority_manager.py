@@ -4,11 +4,11 @@ import os
 import re
 import sys
 
-from .bne import search_bne
 from .dbpedia import search_dbpedia
 from .http_utils import normalize_spaces, text_match
 from .lcsh import search_lcsh
 from .unesco import search_unesco
+from .viaf import search_viaf
 from .wikidata import search_wikidata
 
 logging.basicConfig(
@@ -17,7 +17,7 @@ logging.basicConfig(
 )
 
 SEARCHERS = {
-    "bne": search_bne,
+    "viaf": search_viaf,
     "wikidata": search_wikidata,
     "dbpedia": search_dbpedia,
     "unesco": search_unesco,
@@ -25,7 +25,7 @@ SEARCHERS = {
 }
 
 SOURCE_LABELS = {
-    "bne": "BNE",
+    "viaf": "VIAF",
     "wikidata": "Wikidata",
     "dbpedia": "DBpedia",
     "unesco": "UNESCO",
@@ -35,7 +35,7 @@ SOURCE_LABELS = {
 DATE_RE = re.compile(
     r"^("
     r"\d{3,4}([-/]\d{2,4})?"
-    r"|siglo\s+[ivxlcdm0-9]+"
+    r"|siglos?\s+[ivxlcdm0-9]+([-/][ivxlcdm0-9]+)?"
     r"|s\.\s*[ivxlcdm0-9]+"
     r")$",
     re.IGNORECASE,
@@ -59,7 +59,7 @@ GEOGRAPHIC_TERMS = {
 
 
 def configured_sources():
-    raw = os.getenv("AUTHORITY_SOURCES", "bne,wikidata,dbpedia,unesco,lcsh")
+    raw = os.getenv("AUTHORITY_SOURCES", "viaf,wikidata,dbpedia,unesco,lcsh")
     sources = [source.strip().lower() for source in raw.split(",") if source.strip()]
     return [source for source in sources if source in SEARCHERS]
 
@@ -144,7 +144,11 @@ def score_result(query, item):
 
 def search_source_for_topic(source, searcher, plan, per_source_limit):
     collected = []
-    for component in sorted(plan, key=lambda item: item["priority"]):
+    source_plan = plan
+    if source == "viaf":
+        source_plan = [item for item in plan if item["priority"] == 0]
+
+    for component in sorted(source_plan, key=lambda item: item["priority"]):
         term = component["term"]
         try:
             results = searcher(term, limit=per_source_limit)

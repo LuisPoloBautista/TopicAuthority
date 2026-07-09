@@ -7,17 +7,17 @@ class AuthorityManagerTests(unittest.TestCase):
     def test_normalize_result_uses_uri_as_url(self):
         result = normalize_result(
             {
-                "source": "BNE",
+                "source": "VIAF",
                 "label": "Botánica",
-                "uri": "https://datos.bne.es/resource/XX1",
-                "type": "Materia",
+                "uri": "https://viaf.org/viaf/123/",
+                "type": "Autoridad",
             }
         )
 
-        self.assertEqual(result["source"], "BNE")
+        self.assertEqual(result["source"], "VIAF")
         self.assertEqual(result["term"], "Botánica")
-        self.assertEqual(result["url"], "https://datos.bne.es/resource/XX1")
-        self.assertEqual(result["type"], "Materia")
+        self.assertEqual(result["url"], "https://viaf.org/viaf/123/")
+        self.assertEqual(result["type"], "Autoridad")
 
     def test_search_ignores_unknown_sources(self):
         result = search("Botánica", sources=["unknown-source"])
@@ -30,6 +30,13 @@ class AuthorityManagerTests(unittest.TestCase):
 
         self.assertEqual(parts[0]["term"], "Mineralogía")
         self.assertEqual(parts[0]["role"], "encabezamiento principal")
+        self.assertEqual(parts[-1]["role"], "subdivision cronologica")
+        self.assertTrue(parts[-1]["skip"])
+
+    def test_split_heading_identifies_plural_centuries_as_chronological(self):
+        parts = split_heading("Botánica -- Investigaciones -- México -- Siglos XVIII-XIX")
+
+        self.assertEqual(parts[-1]["term"], "Siglos XVIII-XIX")
         self.assertEqual(parts[-1]["role"], "subdivision cronologica")
         self.assertTrue(parts[-1]["skip"])
 

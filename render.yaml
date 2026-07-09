@@ -15,6 +15,6 @@ services:
       - key: PYTHON_BIN
         value: python3
       - key: AUTHORITY_SOURCES
-        value: bne,wikidata,dbpedia,unesco,lcsh
+        value: viaf,wikidata,dbpedia,unesco,lcsh
       - key: ALLOWED_ORIGINS
         value: "*"
