@@ -17,6 +17,8 @@ def search_wikidata(term, limit=DEFAULT_LIMIT):
             "limit": limit,
         },
     )
+    if data is None:
+        raise RuntimeError("Wikidata no respondio")
     results = []
     for item in (data or {}).get("search", [])[:limit]:
         entity_id = item.get("id", "")
@@ -32,4 +34,3 @@ def search_wikidata(term, limit=DEFAULT_LIMIT):
             }
         )
     return results
-

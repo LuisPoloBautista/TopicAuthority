@@ -103,8 +103,8 @@ function renderTopics(topics) {
   output.innerHTML = `<div class="topic-list">${html}</div>`;
 }
 
-function renderAuthorities(container, authorities) {
-  if (!authorities.length) {
+function renderAuthorities(container, authorities, sources = []) {
+  if (!authorities.length && !sources.length) {
     container.innerHTML = "<p class='authority-empty'>No se encontraron equivalencias directas.</p>";
     return;
   }
@@ -116,7 +116,7 @@ function renderAuthorities(container, authorities) {
     return acc;
   }, {});
 
-  container.innerHTML = Object.entries(bySource).map(([source, items]) => `
+  const resultHtml = Object.entries(bySource).map(([source, items]) => `
     <div class="authority-source">
       <h3>${escapeHtml(source)}</h3>
       <ul>
@@ -124,12 +124,25 @@ function renderAuthorities(container, authorities) {
           <li>
             <a href="${escapeHtml(item.url || item.uri)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.label || item.term)}</a>
             ${item.type ? `<span class="authority-type">${escapeHtml(item.type)}</span>` : ""}
+            ${item.component || item.query ? `<div class="authority-match">Coincidencia: ${escapeHtml(item.component || "consulta")} ${item.query ? `(${escapeHtml(item.query)})` : ""}</div>` : ""}
             ${item.description || item.abstract ? `<p>${escapeHtml(item.description || item.abstract)}</p>` : ""}
           </li>
         `).join("")}
       </ul>
     </div>
   `).join("");
+
+  const sourcesWithResults = new Set(Object.keys(bySource));
+  const statusHtml = sources
+    .filter(source => !sourcesWithResults.has(source.source) && source.status !== "ok")
+    .map(source => `
+      <div class="authority-source authority-source-empty">
+        <h3>${escapeHtml(source.source)}</h3>
+        <p>${source.status === "error" ? "El catálogo no respondió durante esta consulta." : "Sin coincidencias directas para el encabezamiento consultado."}</p>
+      </div>
+    `).join("");
+
+  container.innerHTML = resultHtml + statusHtml;
 }
 
 async function loadAuthoritiesForTopic(topic, card) {
@@ -141,7 +154,7 @@ async function loadAuthoritiesForTopic(topic, card) {
       throw new Error(errData.error || res.statusText);
     }
     const data = await res.json();
-    renderAuthorities(container, data.authorities || []);
+    renderAuthorities(container, data.authorities || [], data.sources || []);
   } catch (error) {
     container.innerHTML = `<p class="authority-error">No se pudieron consultar autoridades: ${escapeHtml(error.message)}</p>`;
   }

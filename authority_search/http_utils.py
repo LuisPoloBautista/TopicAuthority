@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -54,9 +55,19 @@ def text_match(term, label):
     return "related"
 
 
+def strip_markup(value):
+    if not value:
+        return ""
+    return re.sub(r"<[^>]+>", "", str(value))
+
+
 def compact(value, max_len=320):
     if not value:
         return ""
-    value = " ".join(str(value).split())
+    value = strip_markup(value)
+    value = " ".join(value.split())
     return value if len(value) <= max_len else value[: max_len - 1].rstrip() + "…"
 
+
+def normalize_spaces(value):
+    return " ".join(str(value or "").strip().split())

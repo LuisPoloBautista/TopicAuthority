@@ -20,6 +20,8 @@ SELECT ?uri ?label ?type ?description WHERE {{
 LIMIT {int(limit)}
 """
     data = sparql_json(BNE_SPARQL_URL, query)
+    if data is None:
+        raise RuntimeError("BNE no respondio a la consulta SPARQL")
     bindings = (data or {}).get("results", {}).get("bindings", [])
     results = []
     for row in bindings[:limit]:
@@ -38,4 +40,3 @@ LIMIT {int(limit)}
             }
         )
     return results
-

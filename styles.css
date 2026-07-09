@@ -212,6 +212,11 @@ button:hover {
   border-radius: 8px;
 }
 
+.authority-source-empty {
+  background: #f8fafc;
+  border-style: dashed;
+}
+
 .authority-source h3 {
   margin: 0 0 6px;
   color: #0369a1;
@@ -248,6 +253,12 @@ button:hover {
   border-radius: 999px;
   background: #e0f2fe;
   color: #075985;
+  font-size: 12px;
+}
+
+.authority-match {
+  margin-top: 2px;
+  color: #64748b;
   font-size: 12px;
 }
 

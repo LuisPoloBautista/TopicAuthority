@@ -23,6 +23,8 @@ SELECT ?uri ?label ?description WHERE {{
 LIMIT {int(limit)}
 """
     data = sparql_json(UNESCO_SPARQL_URL, query)
+    if data is None:
+        raise RuntimeError("UNESCO no respondio a la consulta SPARQL")
     bindings = (data or {}).get("results", {}).get("bindings", [])
     results = []
     for row in bindings[:limit]:
@@ -40,4 +42,3 @@ LIMIT {int(limit)}
             }
         )
     return results
-

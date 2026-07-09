@@ -10,6 +10,8 @@ LCSH_SUGGEST_URL = os.getenv(
 
 def search_lcsh(term, limit=DEFAULT_LIMIT):
     data = get_json(LCSH_SUGGEST_URL, {"q": term, "count": limit})
+    if data is None:
+        raise RuntimeError("LCSH no respondio")
     if not isinstance(data, list) or len(data) < 4:
         return []
 
@@ -32,4 +34,3 @@ def search_lcsh(term, limit=DEFAULT_LIMIT):
             }
         )
     return results
-

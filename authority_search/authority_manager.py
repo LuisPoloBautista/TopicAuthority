@@ -1,10 +1,12 @@
 import json
 import logging
 import os
+import re
 import sys
 
 from .bne import search_bne
 from .dbpedia import search_dbpedia
+from .http_utils import normalize_spaces, text_match
 from .lcsh import search_lcsh
 from .unesco import search_unesco
 from .wikidata import search_wikidata
@@ -22,11 +24,90 @@ SEARCHERS = {
     "lcsh": search_lcsh,
 }
 
+SOURCE_LABELS = {
+    "bne": "BNE",
+    "wikidata": "Wikidata",
+    "dbpedia": "DBpedia",
+    "unesco": "UNESCO",
+    "lcsh": "LCSH",
+}
+
+DATE_RE = re.compile(
+    r"^("
+    r"\d{3,4}([-/]\d{2,4})?"
+    r"|siglo\s+[ivxlcdm0-9]+"
+    r"|s\.\s*[ivxlcdm0-9]+"
+    r")$",
+    re.IGNORECASE,
+)
+
+GEOGRAPHIC_TERMS = {
+    "mexico",
+    "méxico",
+    "nueva españa",
+    "america",
+    "américa",
+    "america latina",
+    "américa latina",
+    "españa",
+    "colombia",
+    "argentina",
+    "peru",
+    "perú",
+    "chile",
+}
+
 
 def configured_sources():
     raw = os.getenv("AUTHORITY_SOURCES", "bne,wikidata,dbpedia,unesco,lcsh")
     sources = [source.strip().lower() for source in raw.split(",") if source.strip()]
     return [source for source in sources if source in SEARCHERS]
+
+
+def strip_numbering(value):
+    return re.sub(r"^\s*\d+[\.)]\s*", "", value or "").strip()
+
+
+def split_heading(topic):
+    cleaned = strip_numbering(normalize_spaces(topic))
+    parts = [
+        normalize_spaces(part)
+        for part in re.split(r"\s+--\s+", cleaned)
+        if normalize_spaces(part)
+    ]
+    if not parts:
+        return []
+
+    components = [{"term": parts[0], "role": "encabezamiento principal", "priority": 0}]
+    for part in parts[1:]:
+        lower = part.lower()
+        if DATE_RE.match(lower):
+            components.append({"term": part, "role": "subdivision cronologica", "priority": 90, "skip": True})
+        elif lower in GEOGRAPHIC_TERMS:
+            components.append({"term": part, "role": "subdivision geografica", "priority": 40})
+        else:
+            components.append({"term": part, "role": "subdivision de materia", "priority": 30})
+    return components
+
+
+def fallback_queries(topic):
+    cleaned = strip_numbering(normalize_spaces(topic))
+    cleaned = re.sub(r"\s+--\s+", " ", cleaned)
+    cleaned = re.sub(r"\b\d{3,4}([-/]\d{2,4})?\b", "", cleaned)
+    cleaned = normalize_spaces(cleaned)
+    return [{"term": cleaned, "role": "encabezamiento completo normalizado", "priority": 80}] if cleaned else []
+
+
+def query_plan(topic):
+    components = split_heading(topic)
+    include_geographic = os.getenv("AUTHORITY_INCLUDE_GEOGRAPHIC", "false").lower() == "true"
+    searchable = [
+        item for item in components
+        if not item.get("skip") and (include_geographic or item.get("role") != "subdivision geografica")
+    ]
+    if searchable:
+        return searchable
+    return fallback_queries(topic)
 
 
 def normalize_result(item):
@@ -43,21 +124,79 @@ def normalize_result(item):
         "description": item.get("description", ""),
         "abstract": item.get("abstract", ""),
         "match": item.get("match", "related"),
+        "query": item.get("query", ""),
+        "component": item.get("component", ""),
+        "score": item.get("score", 0),
     }
+
+
+def score_result(query, item):
+    label = item.get("label", "")
+    match = item.get("match") or text_match(query, label)
+    if match in {"exact", "label"}:
+        return 100
+    if match in {"partial", "alias"}:
+        return 80
+    if text_match(query, label) == "partial":
+        return 70
+    return 40
+
+
+def search_source_for_topic(source, searcher, plan, per_source_limit):
+    collected = []
+    for component in sorted(plan, key=lambda item: item["priority"]):
+        term = component["term"]
+        try:
+            results = searcher(term, limit=per_source_limit)
+        except TypeError:
+            results = searcher(term)
+
+        for result in results:
+            result["query"] = term
+            result["component"] = component["role"]
+            result["score"] = score_result(term, result) - component["priority"]
+            collected.append(result)
+
+        # A main-heading hit is the best authority signal. Avoid letting broad
+        # geographic subdivisions dominate the display when the main term worked.
+        if component["priority"] == 0 and results:
+            break
+
+    collected.sort(key=lambda item: item.get("score", 0), reverse=True)
+    return collected[:per_source_limit]
 
 
 def search(topic, sources=None):
     authorities = []
+    source_status = []
     selected_sources = sources or configured_sources()
+    plan = query_plan(topic)
+    per_source_limit = int(os.getenv("AUTHORITY_MAX_RESULTS_PER_SOURCE", os.getenv("AUTHORITY_MAX_RESULTS", "3")))
 
     for source in selected_sources:
         searcher = SEARCHERS.get(source)
         if not searcher:
             continue
         try:
-            authorities.extend(normalize_result(item) for item in searcher(topic))
+            source_results = search_source_for_topic(source, searcher, plan, per_source_limit)
+            authorities.extend(normalize_result(item) for item in source_results)
+            source_status.append(
+                {
+                    "source": SOURCE_LABELS.get(source, source),
+                    "status": "ok" if source_results else "no_matches",
+                    "count": len(source_results),
+                }
+            )
         except Exception as exc:
-            logging.exception("Authority source %s failed for topic %r: %s", source, topic, exc)
+            logging.warning("Authority source %s failed for topic %r: %s", source, topic, exc)
+            source_status.append(
+                {
+                    "source": SOURCE_LABELS.get(source, source),
+                    "status": "error",
+                    "count": 0,
+                    "error": str(exc),
+                }
+            )
 
     seen = set()
     unique = []
@@ -68,7 +207,7 @@ def search(topic, sources=None):
         seen.add(key)
         unique.append(item)
 
-    return {"topic": topic, "authorities": unique}
+    return {"topic": topic, "queries": plan, "sources": source_status, "authorities": unique}
 
 
 def main(argv=None):
@@ -85,4 +224,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
