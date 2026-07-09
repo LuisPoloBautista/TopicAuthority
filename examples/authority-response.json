@@ -1,0 +1,26 @@
+{
+  "topic": "Botánica mexicana del siglo XVIII",
+  "authorities": [
+    {
+      "source": "BNE",
+      "label": "Botánica",
+      "term": "Botánica",
+      "url": "https://datos.bne.es/resource/XX...",
+      "uri": "https://datos.bne.es/resource/XX...",
+      "type": "Materia",
+      "description": "",
+      "match": "partial"
+    },
+    {
+      "source": "Wikidata",
+      "label": "botánica",
+      "term": "botánica",
+      "url": "https://www.wikidata.org/wiki/Q441",
+      "uri": "https://www.wikidata.org/wiki/Q441",
+      "id": "Q441",
+      "type": "Entidad relacionada",
+      "description": "ciencia que estudia las plantas",
+      "match": "related"
+    }
+  ]
+}

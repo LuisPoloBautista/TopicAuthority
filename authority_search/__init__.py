@@ -1,0 +1,2 @@
+"""Authority catalog search package."""
+

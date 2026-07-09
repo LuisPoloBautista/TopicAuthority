@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Asistente de Indización con IA</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+<body>
+  <p class="intro">El asistente de indización con IA permite extraer automáticamente los temas centrales de un documento PDF o texto con OpenAI y buscar equivalencias en catálogos de autoridades externos.</p>
+  
+  <div class="lemb-info">
+    <strong>Formato LEMB:</strong> Los resultados se muestran en formato de la Lista de Encabezamientos de Materia para Bibliotecas.<br/>
+    Estructura: Encabezamiento principal - subdivisión de materia - subdivisión geográfica - subdivisión cronológica - subdivisión de forma.
+  </div>
+
+  <div class="container">
+    <header class="hero">
+      <h1>Asistente de indización con IA</h1>
+      <p>Sube un PDF o pega texto y obtén encabezamientos de materia con equivalencias en BNE, Wikidata, DBpedia, UNESCO y LCSH.</p>
+    </header>
+
+    <div class="block">
+      <h2>1) Importa un PDF</h2>
+      <div id="dropZone" class="drop-zone">
+        <p>Arrastra y suelta un PDF aquí o haz clic para seleccionar</p>
+        <input type="file" id="pdfInput" accept="application/pdf" style="display: none;" />
+      </div>
+      <br/>
+      <button id="processPdfBtn">Procesar PDF</button>
+    </div>
+
+    <div class="block">
+      <h2>2) O pega un texto</h2>
+      <textarea id="textInput" rows="6" placeholder="Pega aquí tu texto o resumen"></textarea>
+      <br/><br/>
+      <button id="processTextBtn">Procesar texto</button>
+    </div>
+
+    <div class="block">
+      <h2>Resultado</h2>
+      <div id="output">Esperando entrada...</div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

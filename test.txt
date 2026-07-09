@@ -1,0 +1,5 @@
+Este documento trata sobre inteligencia artificial y aprendizaje automático. 
+El Dr. Juan Pérez de la UNAM desarrolló una metodología de investigación en 2024.
+Se menciona Microsoft y el Instituto Tecnológico de Monterrey.
+La investigación usa redes neuronales CNN, aprendizaje profundo deep learning, NLP y transformers.
+Los resultados muestran mejoras significativas en precisión.

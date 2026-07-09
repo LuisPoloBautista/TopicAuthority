@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: topicia
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: OPENAI_MODEL
+        value: gpt-5.5
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PYTHON_BIN
+        value: python3
+      - key: AUTHORITY_SOURCES
+        value: bne,wikidata,dbpedia,unesco,lcsh
+      - key: ALLOWED_ORIGINS
+        value: "*"
