@@ -3,6 +3,36 @@ import os
 from .http_utils import DEFAULT_LIMIT, compact, get_json, text_match
 
 WIKIDATA_API_URL = os.getenv("WIKIDATA_API_URL", "https://www.wikidata.org/w/api.php")
+_SEARCH_CACHE = {}
+
+NOISY_DESCRIPTIONS = {
+    "album",
+    "argentine band",
+    "band",
+    "book",
+    "film",
+    "journal",
+    "magazine",
+    "newspaper",
+    "novel",
+    "periodical",
+    "podcast",
+    "song",
+    "television series",
+    "video game",
+    "written work",
+    "álbum",
+    "banda",
+    "canción",
+    "libro",
+    "obra escrita",
+    "película",
+    "periódico",
+    "publicación periódica",
+    "revista",
+    "serie de televisión",
+    "videojuego",
+}
 
 
 def wikidata_languages():
@@ -71,45 +101,78 @@ def _variants_for_entity(entity):
     return unique
 
 
+def _description_for_item(item, entity):
+    description = compact(item.get("description", ""))
+    if description:
+        return description
+
+    user_language = os.getenv("AUTHORITY_LANGUAGE", "es")
+    for language in [user_language, "es", "en"]:
+        value = entity.get("descriptions", {}).get(language, {}).get("value")
+        if value:
+            return compact(value)
+    return ""
+
+
+def _is_noisy_work(description):
+    if os.getenv("WIKIDATA_INCLUDE_WORKS", "false").lower() == "true":
+        return False
+
+    lowered = (description or "").lower()
+    return any(noise in lowered for noise in NOISY_DESCRIPTIONS)
+
+
 def search_wikidata(term, limit=DEFAULT_LIMIT):
+    cache_key = term.lower().strip()
+    if cache_key in _SEARCH_CACHE:
+        return _SEARCH_CACHE[cache_key][:limit]
+
+    result_limit = max(limit, DEFAULT_LIMIT)
     found = []
     seen_ids = set()
+    candidate_limit = max(result_limit * 4, result_limit, 10)
     for language in wikidata_languages():
-        for item in _search_language(term, language, limit):
+        for item in _search_language(term, language, min(candidate_limit, 50)):
             entity_id = item.get("id", "")
             if not entity_id or entity_id in seen_ids:
                 continue
             seen_ids.add(entity_id)
             item["_search_language"] = language
             found.append(item)
-            if len(found) >= limit:
+            if len(found) >= candidate_limit:
                 break
-        if len(found) >= limit:
+        if len(found) >= candidate_limit:
             break
 
     details = _entity_details([item.get("id", "") for item in found])
     results = []
-    for item in found[:limit]:
+    for item in found:
         entity_id = item.get("id", "")
         entity = details.get(entity_id, {})
         variants = _variants_for_entity(entity)
         label = item.get("label", "")
         if variants and text_match(term, label) == "related":
             label = variants[0]
+        description = _description_for_item(item, entity)
+        if _is_noisy_work(description):
+            continue
         results.append(
             {
                 "source": "Wikidata",
                 "label": label,
                 "id": entity_id,
                 "url": item.get("concepturi") or f"https://www.wikidata.org/wiki/{entity_id}",
-                "description": compact(item.get("description", "")),
+                "description": description,
                 "type": "Entidad relacionada",
                 "match": item.get("match", {}).get("type", "related"),
                 "variants": variants,
                 "language": item.get("_search_language", ""),
             }
         )
-    return results
+        if len(results) >= result_limit:
+            break
+    _SEARCH_CACHE[cache_key] = results
+    return results[:limit]
 
 
 def get_wikidata_variants(term, limit=3):

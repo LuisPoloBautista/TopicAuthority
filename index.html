@@ -8,53 +8,57 @@
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
 <body>
-  <p class="intro">El asistente de indización con IA permite extraer automáticamente los temas centrales de un documento PDF o texto con OpenAI y buscar equivalencias en catálogos de autoridades externos.</p>
-  
-  <div class="lemb-info">
-    <strong>Formato LEMB:</strong> Los resultados se muestran en formato de la Lista de Encabezamientos de Materia para Bibliotecas.<br/>
-    Estructura: Encabezamiento principal - subdivisión de materia - subdivisión geográfica - subdivisión cronológica - subdivisión de forma.
-  </div>
+  <div class="app-shell">
+    <main class="container">
+      <header class="hero">
+        <h1>Asistente de indización con IA</h1>
+        <p>Sube un PDF o pega texto y obtén encabezamientos de materia con equivalencias en VIAF, Wikidata, BNE, DBpedia, UNESCO y LCSH.</p>
+      </header>
 
-  <details class="important-info">
-    <summary>Información importante para tener en cuenta</summary>
-    <div class="important-info-content">
-      <p>Las equivalencias externas son una ayuda para revisión, no una validación automática definitiva.</p>
-      <ul>
-        <li>La búsqueda se centra en el encabezamiento principal y omite fechas y lugares por defecto para evitar coincidencias demasiado generales.</li>
-        <li>Una coincidencia en VIAF, Wikidata, UNESCO, LCSH o DBpedia debe revisarse antes de incorporarse al registro final.</li>
-        <li>VIAF es especialmente útil para nombres personales, entidades y formas autorizadas; no siempre cubre materias temáticas.</li>
-        <li>Si una fuente no responde o no ofrece coincidencias, el sistema lo mostrará debajo del tema.</li>
-      </ul>
-    </div>
-  </details>
-
-  <div class="container">
-    <header class="hero">
-      <h1>Asistente de indización con IA</h1>
-      <p>Sube un PDF o pega texto y obtén encabezamientos de materia con equivalencias en VIAF, Wikidata, DBpedia, UNESCO y LCSH.</p>
-    </header>
-
-    <div class="block">
-      <h2>1) Importa un PDF</h2>
-      <div id="dropZone" class="drop-zone">
-        <p>Arrastra y suelta un PDF aquí o haz clic para seleccionar</p>
-        <input type="file" id="pdfInput" accept="application/pdf" style="display: none;" />
+      <p class="intro">El asistente de indización con IA permite extraer automáticamente los temas centrales de un documento PDF o texto con OpenAI y buscar equivalencias en catálogos de autoridades externos.</p>
+      
+      <div class="lemb-info">
+        <strong>Formato LEMB:</strong> Los resultados se muestran en formato de la Lista de Encabezamientos de Materia para Bibliotecas.<br/>
+        Estructura: Encabezamiento principal - subdivisión de materia - subdivisión geográfica - subdivisión cronológica - subdivisión de forma.
       </div>
-      <br/>
-      <button id="processPdfBtn">Procesar PDF</button>
-    </div>
 
-    <div class="block">
-      <h2>2) O pega un texto</h2>
-      <textarea id="textInput" rows="6" placeholder="Pega aquí tu texto o resumen"></textarea>
-      <br/><br/>
-      <button id="processTextBtn">Procesar texto</button>
-    </div>
+      <div class="block">
+        <h2>1) Importa un PDF</h2>
+        <div id="dropZone" class="drop-zone">
+          <p>Arrastra y suelta un PDF aquí o haz clic para seleccionar</p>
+          <input type="file" id="pdfInput" accept="application/pdf" style="display: none;" />
+        </div>
+        <br/>
+        <button id="processPdfBtn">Procesar PDF</button>
+      </div>
 
-    <div class="block">
-      <h2>Resultado</h2>
-      <div id="output">Esperando entrada...</div>
-    </div>
+      <div class="block">
+        <h2>2) O pega un texto</h2>
+        <textarea id="textInput" rows="6" placeholder="Pega aquí tu texto o resumen"></textarea>
+        <br/><br/>
+        <button id="processTextBtn">Procesar texto</button>
+      </div>
+
+      <div class="block">
+        <h2>Resultado</h2>
+        <div id="output">Esperando entrada...</div>
+      </div>
+    </main>
+
+    <aside class="info-sidebar" id="infoSidebar">
+      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Contraer información">i</button>
+      <div class="sidebar-content">
+        <h2>Información importante</h2>
+        <p>Las equivalencias externas son una ayuda para revisión, no una validación automática definitiva.</p>
+        <ul>
+          <li>La búsqueda se centra en el encabezamiento principal y omite fechas y lugares por defecto.</li>
+          <li>Una coincidencia en VIAF, Wikidata, BNE, UNESCO, LCSH o DBpedia debe revisarse antes del registro final.</li>
+          <li>VIAF es más útil para nombres personales, entidades y formas autorizadas que para materias temáticas.</li>
+          <li>Wikidata se usa como puente multilingüe para consultar LCSH y DBpedia con variantes como <em>typhus</em> o <em>botany</em>.</li>
+          <li>Si una fuente no responde o está saturada, el sistema lo indicará sin detener las demás fuentes.</li>
+        </ul>
+      </div>
+    </aside>
   </div>
 
   <script src="script.js"></script>

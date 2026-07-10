@@ -120,6 +120,21 @@ async function generateTopics(text) {
 }
 
 async function searchAuthorities(topic) {
+  const fallbackPayload = {
+    topic,
+    queries: [{ term: topic, role: 'encabezamiento principal', priority: 0 }],
+    sources: [
+      { source: 'Wikidata', status: 'error', count: 0 },
+      { source: 'BNE', status: 'error', count: 0 },
+      { source: 'DBpedia', status: 'error', count: 0 },
+      { source: 'LCSH', status: 'error', count: 0 },
+      { source: 'UNESCO', status: 'error', count: 0 },
+      { source: 'VIAF', status: 'error', count: 0 },
+    ],
+    authorities: [],
+    partial: true,
+  };
+
   try {
     const { stdout, stderr } = await execFileAsync(
       PYTHON_BIN,
@@ -141,7 +156,7 @@ async function searchAuthorities(topic) {
         return JSON.parse(String(error.stdout).slice(jsonStart));
       }
     }
-    throw error;
+    return fallbackPayload;
   }
 }
 

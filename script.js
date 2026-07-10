@@ -4,6 +4,16 @@ const textInput = document.getElementById("textInput");
 const processTextBtn = document.getElementById("processTextBtn");
 const output = document.getElementById("output");
 const dropZone = document.getElementById("dropZone");
+const sidebar = document.getElementById("infoSidebar");
+const sidebarToggle = document.getElementById("sidebarToggle");
+
+if (sidebarToggle && sidebar) {
+  sidebarToggle.setAttribute("aria-expanded", String(!sidebar.classList.contains("collapsed")));
+  sidebarToggle.addEventListener("click", () => {
+    sidebar.classList.toggle("collapsed");
+    sidebarToggle.setAttribute("aria-expanded", String(!sidebar.classList.contains("collapsed")));
+  });
+}
 
 dropZone.addEventListener("click", () => {
   pdfInput.click();
@@ -156,13 +166,16 @@ async function loadAuthoritiesForTopic(topic, card) {
     const data = await res.json();
     renderAuthorities(container, data.authorities || [], data.sources || []);
   } catch (error) {
-    container.innerHTML = `<p class="authority-error">No se pudieron consultar autoridades: ${escapeHtml(error.message)}</p>`;
+    container.innerHTML = `<p class="authority-error">No se pudieron consultar autoridades en este momento. Intenta de nuevo más tarde.</p>`;
   }
 }
 
 async function loadAuthorities(topics) {
   const cards = [...document.querySelectorAll(".topic-card")];
-  await Promise.all(cards.map((card, index) => loadAuthoritiesForTopic(topics[index], card)));
+  for (let index = 0; index < cards.length; index++) {
+    await loadAuthoritiesForTopic(topics[index], cards[index]);
+    await new Promise(resolve => setTimeout(resolve, 350));
+  }
 }
 
 async function analyzeText(sourceText) {

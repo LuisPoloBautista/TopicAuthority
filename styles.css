@@ -12,17 +12,25 @@ body {
   margin: 0;
 }
 
+.app-shell {
+  width: 75%;
+  max-width: 1360px;
+  min-width: 920px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
 .intro {
-  text-align: center;
-  max-width: 700px;
-  margin: 0 auto 24px;
+  margin: 0 0 24px;
   color: #475569;
   font-size: 16px;
 }
 
 .lemb-info {
-  max-width: 700px;
-  margin: 0 auto 24px;
+  margin: 0 0 24px;
   padding: 16px 20px;
   background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
   border-left: 4px solid #0284c7;
@@ -40,38 +48,61 @@ body {
   font-weight: 500;
 }
 
-.important-info {
-  max-width: 700px;
-  margin: 0 auto 24px;
+.info-sidebar {
+  position: sticky;
+  top: 24px;
   border: 1px solid #fed7aa;
   border-radius: 8px;
   background: #fff7ed;
   color: #7c2d12;
+  transition: width 0.2s ease, padding 0.2s ease;
 }
 
-.important-info summary {
-  padding: 14px 18px;
-  cursor: pointer;
+.sidebar-toggle {
+  position: absolute;
+  top: 10px;
+  left: -17px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  background: #f97316;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
   font-weight: 700;
 }
 
-.important-info-content {
-  padding: 0 18px 16px;
+.sidebar-content {
+  padding: 18px;
   font-size: 14px;
 }
 
-.important-info-content p {
-  margin: 0 0 8px;
+.sidebar-content h2 {
+  margin-top: 0;
+  color: #9a3412;
 }
 
-.important-info-content ul {
+.sidebar-content p {
+  margin: 0 0 10px;
+}
+
+.sidebar-content ul {
   margin: 0;
   padding-left: 20px;
 }
 
+.info-sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.info-sidebar.collapsed .sidebar-content {
+  display: none;
+}
+
 .container {
-  max-width: 700px;
-  margin: 0 auto;
+  width: 100%;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
@@ -300,4 +331,45 @@ button:hover {
 
 .authority-error {
   color: #b91c1c;
+}
+
+@media (max-width: 1200px) {
+  .app-shell {
+    width: 92%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+}
+
+@media (max-width: 900px) {
+  body {
+    padding: 16px;
+  }
+
+  .app-shell {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .info-sidebar {
+    position: relative;
+    top: auto;
+    order: -1;
+  }
+
+  .sidebar-toggle {
+    left: auto;
+    right: 10px;
+  }
+
+  .info-sidebar.collapsed {
+    width: 100%;
+    min-height: 54px;
+    border-color: #fed7aa;
+    background: #fff7ed;
+  }
+
+  .authority-section {
+    margin-left: 0;
+  }
 }
