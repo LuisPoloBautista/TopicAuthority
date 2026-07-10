@@ -4,7 +4,8 @@ import os
 import re
 import sys
 
-from .dbpedia import search_dbpedia
+from .dbpedia import has_dbpedia_exact_hint, search_dbpedia
+from .bne import search_bne
 from .http_utils import normalize_spaces, text_match
 from .lcsh import search_lcsh
 from .unesco import search_unesco
@@ -19,6 +20,7 @@ logging.basicConfig(
 SEARCHERS = {
     "viaf": search_viaf,
     "wikidata": search_wikidata,
+    "bne": search_bne,
     "dbpedia": search_dbpedia,
     "unesco": search_unesco,
     "lcsh": search_lcsh,
@@ -27,6 +29,7 @@ SEARCHERS = {
 SOURCE_LABELS = {
     "viaf": "VIAF",
     "wikidata": "Wikidata",
+    "bne": "BNE",
     "dbpedia": "DBpedia",
     "unesco": "UNESCO",
     "lcsh": "LCSH",
@@ -59,7 +62,7 @@ GEOGRAPHIC_TERMS = {
 
 
 def configured_sources():
-    raw = os.getenv("AUTHORITY_SOURCES", "viaf,wikidata,dbpedia,unesco,lcsh")
+    raw = os.getenv("AUTHORITY_SOURCES", "viaf,wikidata,bne,dbpedia,unesco,lcsh")
     sources = [source.strip().lower() for source in raw.split(",") if source.strip()]
     return [source for source in sources if source in SEARCHERS]
 
@@ -72,7 +75,7 @@ def split_heading(topic):
     cleaned = strip_numbering(normalize_spaces(topic))
     parts = [
         normalize_spaces(part)
-        for part in re.split(r"\s+--\s+", cleaned)
+        for part in re.split(r"\s*--\s*", cleaned)
         if normalize_spaces(part)
     ]
     if not parts:
@@ -92,7 +95,7 @@ def split_heading(topic):
 
 def fallback_queries(topic):
     cleaned = strip_numbering(normalize_spaces(topic))
-    cleaned = re.sub(r"\s+--\s+", " ", cleaned)
+    cleaned = re.sub(r"\s*--\s*", " ", cleaned)
     cleaned = re.sub(r"\b\d{3,4}([-/]\d{2,4})?\b", "", cleaned)
     cleaned = normalize_spaces(cleaned)
     return [{"term": cleaned, "role": "encabezamiento completo normalizado", "priority": 80}] if cleaned else []
@@ -179,6 +182,9 @@ def search_source_for_topic(source, searcher, plan, per_source_limit):
     source_plan = plan
     if source == "viaf":
         source_plan = [item for item in plan if item["priority"] == 0]
+    if source == "dbpedia":
+        hint_plan = [item for item in plan if has_dbpedia_exact_hint(item["term"])]
+        source_plan = hint_plan or [item for item in plan if item["priority"] == 0]
 
     for component in sorted(source_plan, key=lambda item: item["priority"]):
         term = component["term"]
@@ -195,7 +201,7 @@ def search_source_for_topic(source, searcher, plan, per_source_limit):
 
         # A main-heading hit is the best authority signal. Avoid letting broad
         # geographic subdivisions dominate the display when the main term worked.
-        if component["priority"] == 0 and results:
+        if component["priority"] == 0 and results and source not in {"dbpedia", "bne", "lcsh"}:
             break
 
     collected.sort(key=lambda item: item.get("score", 0), reverse=True)

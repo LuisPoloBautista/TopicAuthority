@@ -19,6 +19,7 @@ El modulo independiente esta en `authority_search/`:
 
 ```text
 authority_search/
+  bne.py
   viaf.py
   wikidata.py
   dbpedia.py
@@ -37,6 +38,7 @@ python3 -m authority_search.authority_manager "Botanica mexicana del siglo XVIII
 
 - VIAF: autosugerencia de autoridades `https://www.viaf.org/viaf/AutoSuggest`
 - Wikidata: API `wbsearchentities`
+- BNE: consulta SPARQL a `https://datos.bne.es/sparql` con `skos:prefLabel`
 - DBpedia: DBpedia Lookup API
 - UNESCO: consulta SPARQL a `https://vocabularies.unesco.org/sparql`
 - LCSH: endpoint `id.loc.gov/authorities/subjects/suggest`
@@ -103,8 +105,8 @@ GET /api/topics/{topic}/authorities
 | `OPENAI_TIMEOUT_MS` | `120000` | Timeout de OpenAI. |
 | `PORT` | `3000` | Puerto del servidor. |
 | `PYTHON_BIN` | `python3` | Ejecutable usado para llamar el modulo Python. |
-| `AUTHORITY_SOURCES` | `viaf,wikidata,dbpedia,unesco,lcsh` | Fuentes habilitadas. |
-| `AUTHORITY_TIMEOUT_SECONDS` | `8` | Timeout por consulta externa. |
+| `AUTHORITY_SOURCES` | `viaf,wikidata,bne,dbpedia,unesco,lcsh` | Fuentes habilitadas. |
+| `AUTHORITY_TIMEOUT_SECONDS` | `5` | Timeout por consulta externa. |
 | `AUTHORITY_MAX_RESULTS` | `3` | Resultados maximos por fuente. |
 | `AUTHORITY_LANGUAGE` | `es` | Idioma preferente en fuentes que lo soportan. |
 | `AUTHORITY_EXPAND_WITH_WIKIDATA` | `true` | Usa etiquetas y alias de Wikidata como variantes de consulta para LCSH, DBpedia y UNESCO. |
@@ -112,6 +114,9 @@ GET /api/topics/{topic}/authorities
 | `AUTHORITY_INCLUDE_GEOGRAPHIC` | `false` | Si es `true`, tambien busca subdivisiones geograficas como Mexico. Por defecto se omiten para que no opaquen el encabezamiento principal. |
 | `VIAF_INCLUDE_RELATED` | `false` | Si es `true`, muestra coincidencias VIAF relacionadas aunque no sean parciales/exactas. Por defecto se ocultan para evitar ruido en materias. |
 | `VIAF_INCLUDE_PARTIAL` | `false` | Si es `true`, muestra coincidencias parciales de VIAF. Por defecto se ocultan porque suelen ser ruido para materias. |
+| `DBPEDIA_ENABLE_SPARQL` | `false` | Si es `true`, intenta SPARQL en DBpedia. Por defecto se usa lookup/candidatos controlados para evitar timeouts. |
+| `DBPEDIA_LOOKUP_TIMEOUT_SECONDS` | `4` | Timeout del lookup de DBpedia. |
+| `BNE_TIMEOUT_SECONDS` | `5` | Timeout de BNE SPARQL. |
 | `ALLOWED_ORIGINS` | `*` | Origenes permitidos para CORS. |
 
 ## Instalacion local
@@ -145,7 +150,7 @@ Este repositorio incluye `render.yaml`.
    - `OPENAI_API_KEY`
    - `OPENAI_MODEL`
    - `PYTHON_BIN=python3`
-   - `AUTHORITY_SOURCES=viaf,wikidata,dbpedia,unesco,lcsh`
+   - `AUTHORITY_SOURCES=viaf,wikidata,bne,dbpedia,unesco,lcsh`
 5. Deploy.
 
 ## Seguridad

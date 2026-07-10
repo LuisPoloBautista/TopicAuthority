@@ -24,7 +24,7 @@ const PORT = process.env.PORT || 3000;
 const OPENAI_RESPONSES_URL = process.env.OPENAI_RESPONSES_URL || 'https://api.openai.com/v1/responses';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.5';
 const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
-const AUTHORITY_CLI_TIMEOUT_MS = Number(process.env.AUTHORITY_CLI_TIMEOUT_MS || 30000);
+const AUTHORITY_CLI_TIMEOUT_MS = Number(process.env.AUTHORITY_CLI_TIMEOUT_MS || 45000);
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
   .split(',')
@@ -120,18 +120,29 @@ async function generateTopics(text) {
 }
 
 async function searchAuthorities(topic) {
-  const { stdout, stderr } = await execFileAsync(
-    PYTHON_BIN,
-    ['-m', 'authority_search.authority_manager', topic],
-    {
-      cwd: __dirname,
-      timeout: AUTHORITY_CLI_TIMEOUT_MS,
-      maxBuffer: 1024 * 1024,
-      env: process.env,
-    },
-  );
-  if (stderr) console.warn(stderr.trim());
-  return JSON.parse(stdout);
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      PYTHON_BIN,
+      ['-m', 'authority_search.authority_manager', topic],
+      {
+        cwd: __dirname,
+        timeout: AUTHORITY_CLI_TIMEOUT_MS,
+        maxBuffer: 1024 * 1024,
+        env: process.env,
+      },
+    );
+    if (stderr) console.warn(stderr.trim());
+    return JSON.parse(stdout);
+  } catch (error) {
+    if (error.stderr) console.warn(String(error.stderr).trim());
+    if (error.stdout) {
+      const jsonStart = String(error.stdout).indexOf('{');
+      if (jsonStart >= 0) {
+        return JSON.parse(String(error.stdout).slice(jsonStart));
+      }
+    }
+    throw error;
+  }
 }
 
 app.get('/api/health', (req, res) => {
