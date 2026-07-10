@@ -1,17 +1,17 @@
 # topicIA
 
-Asistente de indizacion que recibe un PDF o texto, genera encabezamientos de materia con la API de OpenAI y consulta catalogos externos de autoridades para encontrar equivalencias directas.
+Asistente de indizacion que recibe un PDF o texto, genera encabezamientos de materia con la API de OpenAI y compara autoridades BNE locales mas catalogos externos para encontrar equivalencias directas.
 
 ## Flujo
 
 ```text
 Documento o texto
   -> OpenAI genera temas
-  -> authority_search consulta fuentes externas
+  -> authority_search compara BNE local y consulta fuentes externas
   -> la interfaz muestra equivalencias por tema
 ```
 
-No usa embeddings, bases vectoriales, entrenamiento, RDF local ni indexacion propia. Las equivalencias se obtienen mediante consultas directas a fuentes externas.
+No usa embeddings, bases vectoriales ni entrenamiento. BNE se compara localmente con RapidFuzz a partir de los archivos descargados del Catalogo de autoridades de BNE Lab: https://bnelab.bne.es/dato/catalogo-de-autoridades/. Las demas equivalencias se obtienen mediante consultas directas a fuentes externas.
 
 ## Modulo de autoridades
 
@@ -38,7 +38,7 @@ python3 -m authority_search.authority_manager "Botanica mexicana del siglo XVIII
 
 - VIAF: autosugerencia de autoridades `https://www.viaf.org/viaf/AutoSuggest`
 - Wikidata: API `wbsearchentities`
-- BNE: consulta SPARQL a `https://datos.bne.es/sparql` con `skos:prefLabel`
+- BNE: comparacion local con RapidFuzz sobre `doc_bne/`, con datos tomados de BNE Lab
 - DBpedia: DBpedia Lookup API
 - UNESCO: consulta SPARQL a `https://vocabularies.unesco.org/sparql`
 - LCSH: endpoint `id.loc.gov/authorities/subjects/suggest`
@@ -116,16 +116,24 @@ GET /api/topics/{topic}/authorities
 | `VIAF_INCLUDE_PARTIAL` | `false` | Si es `true`, muestra coincidencias parciales de VIAF. Por defecto se ocultan porque suelen ser ruido para materias. |
 | `DBPEDIA_ENABLE_SPARQL` | `false` | Si es `true`, intenta SPARQL en DBpedia. Por defecto se usa lookup/candidatos controlados para evitar timeouts. |
 | `DBPEDIA_LOOKUP_TIMEOUT_SECONDS` | `4` | Timeout del lookup de DBpedia. |
-| `BNE_TIMEOUT_SECONDS` | `5` | Timeout de BNE SPARQL. |
+| `BNE_LOCAL_DIR` | `doc_bne` | Directorio con JSON/NT locales de encabezamientos y subencabezamientos BNE. |
+| `BNE_INDEX_CACHE` | `doc_bne/bne_authority_index.pkl.gz` | Indice compacto BNE comprimido. Permite desplegar sin subir los archivos BNE gigantes. |
+| `BNE_LOCAL_SCORE_CUTOFF` | `74` | Puntaje minimo de RapidFuzz para aceptar una coincidencia BNE local. |
+| `BNE_INCLUDE_NT` | `false` | Si es `true`, tambien carga `materias.nt`. Por defecto se omite para mejorar tiempo de respuesta en Render. |
 | `ALLOWED_ORIGINS` | `*` | Origenes permitidos para CORS. |
 
 ## Instalacion local
 
 ```bash
 npm install
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m authority_search.bne --build-index
 export OPENAI_API_KEY="tu_clave"
 npm start
 ```
+
+Los archivos `doc_bne/materia-JSON.json` y `doc_bne/materias.nt` superan el limite de GitHub y estan ignorados. El despliegue usa `doc_bne/bne_authority_index.pkl.gz`, generado localmente desde esos datos.
 
 Abre `http://localhost:3000`.
 
@@ -143,7 +151,7 @@ Este repositorio incluye `render.yaml`.
 1. Sube el repositorio a GitHub.
 2. En Render crea un **Web Service** o **Blueprint**.
 3. Usa:
-   - Build Command: `npm install`
+   - Build Command: `npm install && python3 -m pip install --user --break-system-packages -r requirements.txt`
    - Start Command: `npm start`
    - Runtime/Language: `Node`
 4. Configura variables de entorno:

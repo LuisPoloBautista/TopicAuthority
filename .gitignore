@@ -1,4 +1,8 @@
 node_modules/
+.venv/
+.cache/
 .env
 __pycache__/
 *.py[cod]
+doc_bne/materia-JSON.json
+doc_bne/materias.nt

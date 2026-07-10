@@ -161,6 +161,8 @@ def normalize_result(item):
         "match": item.get("match", "related"),
         "query": item.get("query", ""),
         "component": item.get("component", ""),
+        "confidence": item.get("confidence", ""),
+        "source_file": item.get("source_file", ""),
         "score": item.get("score", 0),
     }
 
@@ -184,7 +186,7 @@ def search_source_for_topic(source, searcher, plan, per_source_limit):
         source_plan = [item for item in plan if item["priority"] == 0]
     if source == "dbpedia":
         hint_plan = [item for item in plan if has_dbpedia_exact_hint(item["term"])]
-        source_plan = hint_plan or [item for item in plan if item["priority"] == 0]
+        source_plan = hint_plan or [item for item in plan if item["priority"] <= 10]
 
     for component in sorted(source_plan, key=lambda item: item["priority"]):
         term = component["term"]
@@ -201,6 +203,8 @@ def search_source_for_topic(source, searcher, plan, per_source_limit):
 
         # A main-heading hit is the best authority signal. Avoid letting broad
         # geographic subdivisions dominate the display when the main term worked.
+        if source == "bne" and component["priority"] < 0 and results:
+            break
         if component["priority"] == 0 and results and source not in {"dbpedia", "bne", "lcsh"}:
             break
 
@@ -215,6 +219,13 @@ def search(topic, sources=None):
     selected_sources = [source for source in selected_sources if source in SEARCHERS]
     plan = query_plan(topic)
     expanded_plan = expand_plan_with_wikidata(plan) if selected_sources else plan
+    bne_plan = [
+        {
+            "term": strip_numbering(normalize_spaces(topic)),
+            "role": "encabezamiento completo BNE",
+            "priority": -10,
+        }
+    ] + plan
     per_source_limit = int(os.getenv("AUTHORITY_MAX_RESULTS_PER_SOURCE", os.getenv("AUTHORITY_MAX_RESULTS", "3")))
 
     for source in selected_sources:
@@ -222,7 +233,12 @@ def search(topic, sources=None):
         if not searcher:
             continue
         try:
-            source_plan = plan if source in {"wikidata", "viaf"} else expanded_plan
+            if source == "bne":
+                source_plan = bne_plan
+            elif source in {"wikidata", "viaf"}:
+                source_plan = plan
+            else:
+                source_plan = expanded_plan
             source_results = search_source_for_topic(source, searcher, source_plan, per_source_limit)
             authorities.extend(normalize_result(item) for item in source_results)
             source_status.append(

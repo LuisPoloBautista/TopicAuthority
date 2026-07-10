@@ -12,7 +12,7 @@
     <main class="container">
       <header class="hero">
         <h1>Asistente de indización con IA</h1>
-        <p>Sube un PDF o pega texto y obtén encabezamientos de materia con equivalencias en VIAF, Wikidata, BNE, DBpedia, UNESCO y LCSH.</p>
+        <p>Sube un PDF o pega texto y obtén encabezamientos de materia con equivalencias locales BNE y fuentes externas.</p>
       </header>
 
       <p class="intro">El asistente de indización con IA permite extraer automáticamente los temas centrales de un documento PDF o texto con OpenAI y buscar equivalencias en catálogos de autoridades externos.</p>
@@ -51,10 +51,10 @@
         <h2>Información importante</h2>
         <p>Las equivalencias externas son una ayuda para revisión, no una validación automática definitiva.</p>
         <ul>
-          <li>La búsqueda se centra en el encabezamiento principal y omite fechas y lugares por defecto.</li>
-          <li>Una coincidencia en VIAF, Wikidata, BNE, UNESCO, LCSH o DBpedia debe revisarse antes del registro final.</li>
-          <li>VIAF es más útil para nombres personales, entidades y formas autorizadas que para materias temáticas.</li>
-          <li>Wikidata se usa como puente multilingüe para consultar LCSH y DBpedia con variantes como <em>typhus</em> o <em>botany</em>.</li>
+          <li>Los encabezamientos y subencabezamientos BNE se comparan localmente con RapidFuzz.</li>
+          <li>Los datos BNE se tomaron del <a href="https://bnelab.bne.es/dato/catalogo-de-autoridades/" target="_blank" rel="noopener noreferrer">Catálogo de autoridades de BNE Lab</a>.</li>
+          <li>Wikidata se usa como puente multilingüe para buscar equivalencias en inglés y mejorar DBpedia y LCSH.</li>
+          <li>Una coincidencia en BNE, Wikidata, DBpedia, LCSH, UNESCO o VIAF debe revisarse antes del registro final.</li>
           <li>Si una fuente no responde o está saturada, el sistema lo indicará sin detener las demás fuentes.</li>
         </ul>
       </div>

@@ -3,7 +3,7 @@ services:
     name: topicia
     env: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install && python3 -m pip install --user --break-system-packages -r requirements.txt
     startCommand: npm start
     envVars:
       - key: NODE_VERSION

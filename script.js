@@ -134,6 +134,7 @@ function renderAuthorities(container, authorities, sources = []) {
           <li>
             <a href="${escapeHtml(item.url || item.uri)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.label || item.term)}</a>
             ${item.type ? `<span class="authority-type">${escapeHtml(item.type)}</span>` : ""}
+            ${item.confidence ? `<span class="authority-score">${escapeHtml(item.confidence)}%</span>` : ""}
             ${item.component || item.query ? `<div class="authority-match">Coincidencia: ${escapeHtml(item.component || "consulta")} ${item.query ? `(${escapeHtml(item.query)})` : ""}</div>` : ""}
             ${item.description || item.abstract ? `<p>${escapeHtml(item.description || item.abstract)}</p>` : ""}
           </li>

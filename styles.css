@@ -5,21 +5,20 @@
 body {
   font-family: 'Inter', 'Segoe UI', Roboto, Arial, sans-serif;
   line-height: 1.6;
-  background: #f8fafc;
-  color: #334155;
-  padding: 24px;
+  background: #f6f7f9;
+  color: #1f2937;
+  padding: 32px 18px;
   min-height: 100vh;
   margin: 0;
 }
 
 .app-shell {
-  width: 75%;
-  max-width: 1360px;
-  min-width: 920px;
+  width: min(96vw, 1600px);
+  min-width: 980px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 32px;
   align-items: start;
 }
 
@@ -32,29 +31,32 @@ body {
 .lemb-info {
   margin: 0 0 24px;
   padding: 16px 20px;
-  background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
-  border-left: 4px solid #0284c7;
+  background: #f8fafc;
+  border-left: 3px solid #64748b;
   border-radius: 8px;
   font-size: 14px;
-  color: #0c4a6e;
+  color: #334155;
 }
 
 .lemb-info strong {
-  color: #0369a1;
+  color: #111827;
 }
 
 .lemb-info em {
-  color: #075985;
+  color: #334155;
   font-weight: 500;
 }
 
 .info-sidebar {
   position: sticky;
   top: 24px;
-  border: 1px solid #fed7aa;
-  border-radius: 8px;
-  background: #fff7ed;
-  color: #7c2d12;
+  justify-self: end;
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #374151;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   transition: width 0.2s ease, padding 0.2s ease;
 }
 
@@ -66,19 +68,19 @@ body {
   height: 34px;
   padding: 0;
   border-radius: 999px;
-  background: #f97316;
+  background: #111827;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
   font-weight: 700;
 }
 
 .sidebar-content {
-  padding: 18px;
+  padding: 22px;
   font-size: 14px;
 }
 
 .sidebar-content h2 {
   margin-top: 0;
-  color: #9a3412;
+  color: #111827;
 }
 
 .sidebar-content p {
@@ -88,6 +90,16 @@ body {
 .sidebar-content ul {
   margin: 0;
   padding-left: 20px;
+}
+
+.sidebar-content a {
+  color: #0f766e;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sidebar-content a:hover {
+  text-decoration: underline;
 }
 
 .info-sidebar.collapsed {
@@ -104,10 +116,10 @@ body {
 .container {
   width: 100%;
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 28px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 36px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .hero {
@@ -118,9 +130,9 @@ body {
 }
 
 .hero h1 {
-  font-size: 1.75rem;
+  font-size: 2.2rem;
   margin: 0 0 8px;
-  color: #1e293b;
+  color: #111827;
   font-weight: 600;
 }
 
@@ -131,7 +143,7 @@ body {
 }
 
 h2 {
-  color: #334155;
+  color: #111827;
   font-size: 1.1rem;
   margin-bottom: 12px;
   font-weight: 600;
@@ -149,10 +161,10 @@ input[type="file"],
 textarea {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #d1d5db;
   border-radius: 8px;
-  background: #f8fafc;
-  color: #334155;
+  background: #ffffff;
+  color: #1f2937;
   font-size: 14px;
   font-family: inherit;
   outline: none;
@@ -161,8 +173,8 @@ textarea {
 
 input[type="file"]:focus,
 textarea:focus {
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
 }
 
 textarea {
@@ -171,27 +183,27 @@ textarea {
 }
 
 .drop-zone {
-  border: 2px dashed #cbd5e1;
+  border: 1px dashed #9ca3af;
   border-radius: 8px;
   padding: 28px;
   text-align: center;
-  background: #f8fafc;
-  color: #64748b;
+  background: #ffffff;
+  color: #6b7280;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .drop-zone:hover,
 .drop-zone.dragover {
-  border-color: #0ea5e9;
-  background: #f0f9ff;
+  border-color: #111827;
+  background: #f9fafb;
 }
 
 button {
   border: none;
   border-radius: 8px;
   padding: 12px 24px;
-  background: #0ea5e9;
+  background: #111827;
   color: white;
   font-size: 14px;
   font-weight: 600;
@@ -200,15 +212,15 @@ button {
 }
 
 button:hover {
-  background: #0284c7;
+  background: #374151;
   transform: translateY(-1px);
 }
 
 #output {
   min-height: 60px;
   padding: 16px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
   color: #334155;
 }
@@ -222,9 +234,9 @@ button:hover {
 
 .lemb-entry,
 .topic-card {
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e2e8f0;
-  color: #334155;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #1f2937;
   font-size: 15px;
 }
 
@@ -239,7 +251,7 @@ button:hover {
   gap: 10px;
   align-items: flex-start;
   font-weight: 700;
-  color: #1e293b;
+  color: #111827;
 }
 
 .topic-number {
@@ -249,7 +261,7 @@ button:hover {
   min-width: 26px;
   height: 26px;
   border-radius: 999px;
-  background: #0ea5e9;
+  background: #111827;
   color: #fff;
   font-size: 13px;
 }
@@ -257,7 +269,7 @@ button:hover {
 .authority-section {
   margin: 10px 0 0 36px;
   font-size: 13px;
-  color: #475569;
+  color: #4b5563;
 }
 
 .authority-results {
@@ -268,7 +280,7 @@ button:hover {
   margin-top: 10px;
   padding: 10px 12px;
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
 }
 
@@ -279,7 +291,7 @@ button:hover {
 
 .authority-source h3 {
   margin: 0 0 6px;
-  color: #0369a1;
+  color: #111827;
   font-size: 14px;
 }
 
@@ -297,7 +309,7 @@ button:hover {
 }
 
 .authority-source a {
-  color: #0284c7;
+  color: #0f766e;
   font-weight: 600;
   text-decoration: none;
 }
@@ -311,8 +323,18 @@ button:hover {
   margin-left: 6px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: #e0f2fe;
-  color: #075985;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 12px;
+}
+
+.authority-score {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
   font-size: 12px;
 }
 
@@ -335,9 +357,9 @@ button:hover {
 
 @media (max-width: 1200px) {
   .app-shell {
-    width: 92%;
+    width: 96%;
     min-width: 0;
-    grid-template-columns: minmax(0, 1fr) 280px;
+    grid-template-columns: minmax(0, 1fr) 300px;
   }
 }
 
@@ -365,8 +387,8 @@ button:hover {
   .info-sidebar.collapsed {
     width: 100%;
     min-height: 54px;
-    border-color: #fed7aa;
-    background: #fff7ed;
+    border-color: #e5e7eb;
+    background: #ffffff;
   }
 
   .authority-section {
