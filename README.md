@@ -107,8 +107,11 @@ GET /api/topics/{topic}/authorities
 | `AUTHORITY_TIMEOUT_SECONDS` | `8` | Timeout por consulta externa. |
 | `AUTHORITY_MAX_RESULTS` | `3` | Resultados maximos por fuente. |
 | `AUTHORITY_LANGUAGE` | `es` | Idioma preferente en fuentes que lo soportan. |
+| `AUTHORITY_EXPAND_WITH_WIKIDATA` | `true` | Usa etiquetas y alias de Wikidata como variantes de consulta para LCSH, DBpedia y UNESCO. |
+| `AUTHORITY_QUERY_VARIANTS` | `4` | Maximo de variantes de Wikidata agregadas a la consulta. |
 | `AUTHORITY_INCLUDE_GEOGRAPHIC` | `false` | Si es `true`, tambien busca subdivisiones geograficas como Mexico. Por defecto se omiten para que no opaquen el encabezamiento principal. |
 | `VIAF_INCLUDE_RELATED` | `false` | Si es `true`, muestra coincidencias VIAF relacionadas aunque no sean parciales/exactas. Por defecto se ocultan para evitar ruido en materias. |
+| `VIAF_INCLUDE_PARTIAL` | `false` | Si es `true`, muestra coincidencias parciales de VIAF. Por defecto se ocultan porque suelen ser ruido para materias. |
 | `ALLOWED_ORIGINS` | `*` | Origenes permitidos para CORS. |
 
 ## Instalacion local

@@ -9,7 +9,7 @@ from .http_utils import normalize_spaces, text_match
 from .lcsh import search_lcsh
 from .unesco import search_unesco
 from .viaf import search_viaf
-from .wikidata import search_wikidata
+from .wikidata import get_wikidata_variants, search_wikidata
 
 logging.basicConfig(
     level=os.getenv("AUTHORITY_LOG_LEVEL", "INFO"),
@@ -110,6 +110,38 @@ def query_plan(topic):
     return fallback_queries(topic)
 
 
+def expand_plan_with_wikidata(plan):
+    if os.getenv("AUTHORITY_EXPAND_WITH_WIKIDATA", "true").lower() != "true":
+        return plan
+
+    max_variants = int(os.getenv("AUTHORITY_QUERY_VARIANTS", "4"))
+    expanded = list(plan)
+    seen = {item["term"].lower() for item in expanded}
+    main_terms = [item["term"] for item in plan if item.get("priority") == 0]
+
+    for term in main_terms:
+        try:
+            variants = get_wikidata_variants(term, limit=2)
+        except Exception as exc:
+            logging.warning("Wikidata variant expansion failed for %r: %s", term, exc)
+            continue
+        for variant in variants:
+            key = variant.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            expanded.append(
+                {
+                    "term": variant,
+                    "role": "variante Wikidata",
+                    "priority": 10,
+                }
+            )
+            if len([item for item in expanded if item.get("role") == "variante Wikidata"]) >= max_variants:
+                return expanded
+    return expanded
+
+
 def normalize_result(item):
     label = item.get("label") or item.get("term") or ""
     url = item.get("url") or item.get("uri") or ""
@@ -174,7 +206,9 @@ def search(topic, sources=None):
     authorities = []
     source_status = []
     selected_sources = sources or configured_sources()
+    selected_sources = [source for source in selected_sources if source in SEARCHERS]
     plan = query_plan(topic)
+    expanded_plan = expand_plan_with_wikidata(plan) if selected_sources else plan
     per_source_limit = int(os.getenv("AUTHORITY_MAX_RESULTS_PER_SOURCE", os.getenv("AUTHORITY_MAX_RESULTS", "3")))
 
     for source in selected_sources:
@@ -182,7 +216,8 @@ def search(topic, sources=None):
         if not searcher:
             continue
         try:
-            source_results = search_source_for_topic(source, searcher, plan, per_source_limit)
+            source_plan = plan if source in {"wikidata", "viaf"} else expanded_plan
+            source_results = search_source_for_topic(source, searcher, source_plan, per_source_limit)
             authorities.extend(normalize_result(item) for item in source_results)
             source_status.append(
                 {
@@ -211,7 +246,7 @@ def search(topic, sources=None):
         seen.add(key)
         unique.append(item)
 
-    return {"topic": topic, "queries": plan, "sources": source_status, "authorities": unique}
+    return {"topic": topic, "queries": expanded_plan, "sources": source_status, "authorities": unique}
 
 
 def main(argv=None):

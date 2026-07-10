@@ -15,10 +15,13 @@ def search_viaf(term, limit=DEFAULT_LIMIT):
 
     results = []
     include_related = os.getenv("VIAF_INCLUDE_RELATED", "false").lower() == "true"
+    include_partial = os.getenv("VIAF_INCLUDE_PARTIAL", "false").lower() == "true"
     for item in data.get("result") or []:
         viaf_id = str(item.get("viafid") or "").strip()
         label = item.get("term") or item.get("displayForm") or ""
         match = text_match(term, label)
+        if match == "partial" and not include_partial:
+            continue
         if match == "related" and not include_related:
             continue
 
