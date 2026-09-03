@@ -129,6 +129,7 @@ async function searchAuthorities(topic) {
       { source: 'DBpedia', status: 'error', count: 0 },
       { source: 'LCSH', status: 'error', count: 0 },
       { source: 'UNESCO', status: 'error', count: 0 },
+      { source: 'EuroVoc', status: 'error', count: 0 },
       { source: 'VIAF', status: 'error', count: 0 },
     ],
     authorities: [],

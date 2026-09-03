@@ -112,8 +112,8 @@ function renderTopics(topics) {
         <span>${escapeHtml(topic)}</span>
       </div>
       <div class="authority-section">
-        <strong>Equivalencias encontradas:</strong>
-        <div class="authority-results">Consultando catálogos de autoridad...</div>
+        <strong>Comprobación en vocabularios controlados:</strong>
+        <div class="authority-results">Consultando fuentes de autoridad...</div>
       </div>
     </article>
   `).join("");
@@ -121,7 +121,11 @@ function renderTopics(topics) {
 }
 
 function sourcePriority(source) {
-  return ({ LCSH: 0, BNE: 1, UNESCO: 2, VIAF: 3, Wikidata: 4, DBpedia: 5 })[source] ?? 99;
+  return ({ LCSH: 0, BNE: 1, UNESCO: 2, EuroVoc: 3, Wikidata: 4, VIAF: 5, DBpedia: 6 })[source] ?? 99;
+}
+
+function sourceDisplayName(source) {
+  return source === "LCSH" ? "Library of Congress Subject Headings (LCSH)" : source;
 }
 
 function marcAuthority(item) {
@@ -130,6 +134,7 @@ function marcAuthority(item) {
     LCSH: { ind2: "0", sourceCode: "" },
     BNE: { ind2: "7", sourceCode: "embne" },
     UNESCO: { ind2: "7", sourceCode: "unescot" },
+    EuroVoc: { ind2: "7", sourceCode: "eurovoc" },
     VIAF: { ind2: "4", sourceCode: "" },
     Wikidata: { ind2: "7", sourceCode: "wikidata" },
     DBpedia: { ind2: "4", sourceCode: "" }
@@ -155,7 +160,7 @@ function useAuthority(item) {
 
 function renderAuthorities(container, authorities, sources = []) {
   if (!authorities.length && !sources.length) {
-    container.innerHTML = "<p class='authority-empty'>No se encontraron equivalencias directas.</p>";
+    container.innerHTML = "<p class='authority-empty'>No se encontró una autoridad suficientemente cercana. Prueba un término más general o una variante.</p>";
     return;
   }
 
@@ -169,12 +174,13 @@ function renderAuthorities(container, authorities, sources = []) {
 
   const resultHtml = Object.entries(bySource).map(([source, items]) => `
     <div class="authority-source">
-      <h3>${escapeHtml(source)}</h3>
+      <h3>${escapeHtml(sourceDisplayName(source))}</h3>
       <ul>
         ${items.map(item => `
           <li>
             <a href="${escapeHtml(item.url || item.uri)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.label || item.term)}</a>
             ${item.type ? `<span class="authority-type">${escapeHtml(item.type)}</span>` : ""}
+            ${item.match ? `<span class="authority-match-badge authority-match-${escapeHtml(item.match)}">${escapeHtml({exact:"Coincidencia exacta",label:"Término preferido",partial:"Coincidencia parcial",alias:"Variante autorizada",fuzzy:"Coincidencia aproximada"}[item.match] || "Relacionado")}</span>` : ""}
             ${item.confidence ? `<span class="authority-score">${escapeHtml(item.confidence)}%</span>` : ""}
             ${item.component || item.query ? `<div class="authority-match">Coincidencia: ${escapeHtml(item.component || "consulta")} ${item.query ? `(${escapeHtml(item.query)})` : ""}</div>` : ""}
             ${item.description || item.abstract ? `<p>${escapeHtml(item.description || item.abstract)}</p>` : ""}
@@ -190,8 +196,8 @@ function renderAuthorities(container, authorities, sources = []) {
     .filter(source => !sourcesWithResults.has(source.source) && source.status !== "ok")
     .map(source => `
       <div class="authority-source authority-source-empty">
-        <h3>${escapeHtml(source.source)}</h3>
-        <p>${source.status === "error" ? "El catálogo no respondió durante esta consulta." : "Sin coincidencias directas para el encabezamiento consultado."}</p>
+        <h3>${escapeHtml(sourceDisplayName(source.source))}</h3>
+        <p>${source.status === "error" ? "La fuente no estuvo disponible durante esta consulta." : "No encontró una autoridad con relevancia suficiente."}</p>
       </div>
     `).join("");
 
@@ -251,13 +257,13 @@ async function analyzeText(sourceText) {
     return;
   }
 
-  output.textContent = "Analizando con OpenAI y preparando búsqueda de autoridades...";
+  output.textContent = "Identificando conceptos y verificándolos en vocabularios de autoridad...";
 
   try {
     const data = await requestTopics(sourceText);
     const topics = topicsFromResponse(data);
     if (!topics.length) {
-      output.textContent = "No se obtuvo ningún tema de la API.";
+      output.textContent = "No se pudieron identificar candidatos temáticos en el contenido proporcionado.";
       return;
     }
 

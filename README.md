@@ -54,6 +54,7 @@ python3 -m authority_search.authority_manager "Botanica mexicana del siglo XVIII
 - BNE: comparacion local con RapidFuzz sobre `doc_bne/`, con datos tomados de BNE Lab
 - DBpedia: DBpedia Lookup API
 - UNESCO: consulta SPARQL a `https://vocabularies.unesco.org/sparql`
+- EuroVoc: tesauro multilingue oficial de la Union Europea mediante su endpoint SPARQL
 - LCSH: endpoint `id.loc.gov/authorities/subjects/suggest`
 
 Cada fuente puede fallar sin detener el flujo completo; el servidor registra el error y devuelve las fuentes que si respondieron.
@@ -118,7 +119,7 @@ GET /api/topics/{topic}/authorities
 | `OPENAI_TIMEOUT_MS` | `120000` | Timeout de OpenAI. |
 | `PORT` | `3000` | Puerto del servidor. |
 | `PYTHON_BIN` | `python3` | Ejecutable usado para llamar el modulo Python. |
-| `AUTHORITY_SOURCES` | `lcsh,bne,unesco,wikidata,viaf,dbpedia` | Fuentes habilitadas, priorizando LC y vocabularios en espanol. |
+| `AUTHORITY_SOURCES` | `lcsh,bne,unesco,eurovoc,wikidata,viaf,dbpedia` | Fuentes habilitadas, priorizando LC y vocabularios multilingues en espanol. |
 | `AUTHORITY_TIMEOUT_SECONDS` | `5` | Timeout por consulta externa. |
 | `AUTHORITY_MAX_RESULTS` | `3` | Resultados maximos por fuente. |
 | `AUTHORITY_LANGUAGE` | `es` | Idioma preferente en fuentes que lo soportan. |
@@ -171,7 +172,7 @@ Este repositorio incluye `render.yaml`.
    - `OPENAI_API_KEY`
    - `OPENAI_MODEL`
    - `PYTHON_BIN=python3`
-   - `AUTHORITY_SOURCES=lcsh,bne,unesco,wikidata,viaf,dbpedia`
+   - `AUTHORITY_SOURCES=lcsh,bne,unesco,eurovoc,wikidata,viaf,dbpedia`
 5. Deploy.
 
 ## Seguridad

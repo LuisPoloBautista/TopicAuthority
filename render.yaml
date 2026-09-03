@@ -15,7 +15,7 @@ services:
       - key: PYTHON_BIN
         value: python3
       - key: AUTHORITY_SOURCES
-        value: lcsh,bne,unesco,wikidata,viaf,dbpedia
+        value: lcsh,bne,unesco,eurovoc,wikidata,viaf,dbpedia
       - key: DBPEDIA_ENABLE_SPARQL
         value: false
       - key: ALLOWED_ORIGINS

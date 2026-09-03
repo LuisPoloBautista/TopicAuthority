@@ -6,6 +6,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .dbpedia import has_dbpedia_exact_hint, search_dbpedia
+from .eurovoc import search_eurovoc
 from .bne import search_bne
 from .http_utils import normalize_spaces, text_match
 from .lcsh import search_lcsh
@@ -25,6 +26,7 @@ SEARCHERS = {
     "dbpedia": search_dbpedia,
     "unesco": search_unesco,
     "lcsh": search_lcsh,
+    "eurovoc": search_eurovoc,
 }
 
 SOURCE_LABELS = {
@@ -34,6 +36,7 @@ SOURCE_LABELS = {
     "dbpedia": "DBpedia",
     "unesco": "UNESCO",
     "lcsh": "LCSH",
+    "eurovoc": "EuroVoc",
 }
 
 DATE_RE = re.compile(
@@ -63,7 +66,7 @@ GEOGRAPHIC_TERMS = {
 
 
 def configured_sources():
-    raw = os.getenv("AUTHORITY_SOURCES", "lcsh,bne,unesco,wikidata,viaf,dbpedia")
+    raw = os.getenv("AUTHORITY_SOURCES", "lcsh,bne,unesco,eurovoc,wikidata,viaf,dbpedia")
     sources = [source.strip().lower() for source in raw.split(",") if source.strip()]
     return [source for source in sources if source in SEARCHERS]
 
@@ -177,6 +180,8 @@ def score_result(query, item):
         return 80
     if text_match(query, label) == "partial":
         return 70
+    if match == "fuzzy" and item.get("confidence"):
+        return float(item["confidence"])
     return 40
 
 
@@ -191,22 +196,27 @@ def search_source_for_topic(source, searcher, plan, per_source_limit):
 
     for component in sorted(source_plan, key=lambda item: item["priority"]):
         term = component["term"]
+        accepted_for_component = 0
         try:
             results = searcher(term, limit=per_source_limit)
         except TypeError:
             results = searcher(term)
 
         for result in results:
+            relevance = score_result(term, result)
+            if relevance < 70:
+                continue
             result["query"] = term
             result["component"] = component["role"]
-            result["score"] = score_result(term, result) - component["priority"]
+            result["score"] = relevance - component["priority"]
             collected.append(result)
+            accepted_for_component += 1
 
         # A main-heading hit is the best authority signal. Avoid letting broad
         # geographic subdivisions dominate the display when the main term worked.
-        if source == "bne" and component["priority"] < 0 and results:
+        if source == "bne" and component["priority"] < 0 and accepted_for_component:
             break
-        if component["priority"] == 0 and results and source not in {"dbpedia", "bne", "lcsh"}:
+        if component["priority"] == 0 and accepted_for_component and source not in {"dbpedia", "bne", "lcsh"}:
             break
 
     collected.sort(key=lambda item: item.get("score", 0), reverse=True)
@@ -220,7 +230,7 @@ def search(topic, sources=None):
     selected_sources = [source for source in selected_sources if source in SEARCHERS]
     plan = query_plan(topic)
     primary_plan = [item for item in plan if item.get("priority") == 0] or plan[:1]
-    needs_multilingual_variants = any(source in {"lcsh", "dbpedia", "unesco"} for source in selected_sources)
+    needs_multilingual_variants = any(source in {"lcsh", "dbpedia", "unesco", "eurovoc"} for source in selected_sources)
     expanded_plan = expand_plan_with_wikidata(primary_plan) if needs_multilingual_variants else primary_plan
     bne_plan = [
         {

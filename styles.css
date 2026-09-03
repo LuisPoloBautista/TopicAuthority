@@ -393,6 +393,29 @@ button:hover {
   font-size: 12px;
 }
 
+.authority-match-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+}
+
+.authority-match-exact,
+.authority-match-label {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.authority-match-partial,
+.authority-match-alias,
+.authority-match-fuzzy {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .authority-match {
   margin-top: 2px;
   color: #64748b;

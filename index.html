@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Asistente de Indización con IA</title>
+  <title>Asistente de autoridades de materia MARC21</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
@@ -18,62 +18,61 @@
   <div class="app-shell">
     <main class="container">
       <header class="hero">
-        <h1>Asistente de indización con IA</h1>
-        <p>Sube un PDF o pega texto y obtén encabezamientos de materia con equivalencias locales BNE y fuentes externas.</p>
+        <h1>Autoridades de materia MARC21</h1>
+        <p>Busca, valida y transfiere términos controlados para la etiqueta 650 de Koha.</p>
       </header>
 
-      <p class="intro">El asistente de indización con IA permite extraer automáticamente los temas centrales de un documento PDF o texto con OpenAI y buscar equivalencias en catálogos de autoridades externos.</p>
+      <p class="intro">Escribe un encabezamiento de materia o utiliza el contexto bibliográfico de Koha. La herramienta consulta vocabularios controlados y permite incorporar la autoridad seleccionada al formulario MARC.</p>
       
       <div class="lemb-info">
-        <strong>Formato LEMB:</strong> Los resultados se muestran en formato de la Lista de Encabezamientos de Materia para Bibliotecas.<br/>
-        Estructura: Encabezamiento principal - subdivisión de materia - subdivisión geográfica - subdivisión cronológica - subdivisión de forma.
+        <strong>Verificación de autoridades:</strong> las sugerencias generadas por IA son candidatos, no autoridades confirmadas. Utiliza preferentemente resultados exactos o términos preferidos de LCSH, BNE, UNESCO y EuroVoc.
       </div>
 
       <div class="block authority-query" id="authorityQueryBlock">
-        <h2>1) Escribe o revisa el término de materia</h2>
+        <h2>1) Buscar un encabezamiento de materia</h2>
         <label for="authorityTermInput">Tema o encabezamiento 650</label>
         <input id="authorityTermInput" type="text" placeholder="Ejemplo: Inteligencia artificial -- Aspectos éticos" autocomplete="off" />
         <div class="koha-actions">
           <button id="searchAuthorityBtn" type="button">Buscar en autoridades</button>
           <button id="analyzeKohaBtn" type="button" hidden>Obtener sugerencias desde los campos MARC</button>
         </div>
-        <p id="kohaContextMessage" class="query-help">Escribe un término para buscar su forma autorizada en LC, BNE, UNESCO y otras fuentes.</p>
+        <p id="kohaContextMessage" class="query-help">Escribe un término para localizar formas autorizadas y equivalencias multilingües.</p>
       </div>
 
       <div class="block">
-        <h2>2) Importa un PDF</h2>
+        <h2>2) Generar sugerencias desde un PDF</h2>
         <div id="dropZone" class="drop-zone">
           <p>Arrastra y suelta un PDF aquí o haz clic para seleccionar</p>
           <input type="file" id="pdfInput" accept="application/pdf" style="display: none;" />
         </div>
         <br/>
-        <button id="processPdfBtn">Procesar PDF</button>
+        <button id="processPdfBtn">Analizar PDF y buscar autoridades</button>
       </div>
 
       <div class="block">
-        <h2>3) O analiza otro texto</h2>
-        <textarea id="textInput" rows="6" placeholder="Pega aquí tu texto o resumen"></textarea>
+        <h2>3) Generar sugerencias desde un texto</h2>
+        <textarea id="textInput" rows="6" placeholder="Pega un resumen, tabla de contenido o descripción temática"></textarea>
         <br/><br/>
-        <button id="processTextBtn">Procesar texto</button>
+        <button id="processTextBtn">Analizar texto y buscar autoridades</button>
       </div>
 
       <div class="block">
-        <h2>Resultado</h2>
-        <div id="output">Esperando entrada...</div>
+        <h2>Autoridades encontradas</h2>
+        <div id="output">Escribe un término, utiliza el contexto de Koha o analiza un documento.</div>
       </div>
     </main>
 
     <aside class="info-sidebar" id="infoSidebar">
       <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Contraer información">i</button>
       <div class="sidebar-content">
-        <h2>Información importante</h2>
-        <p>Las equivalencias externas son una ayuda para revisión, no una validación automática definitiva.</p>
+        <h2>Cómo interpretar los resultados</h2>
+        <p>La herramienta ordena las fuentes bibliotecarias y muestra el grado de correspondencia encontrado.</p>
         <ul>
-          <li>Los encabezamientos y subencabezamientos BNE se comparan localmente con RapidFuzz.</li>
-          <li>Los datos BNE se tomaron del <a href="https://bnelab.bne.es/dato/catalogo-de-autoridades/" target="_blank" rel="noopener noreferrer">Catálogo de autoridades de BNE Lab</a>.</li>
-          <li>Wikidata se usa como puente multilingüe para buscar equivalencias en inglés y mejorar DBpedia y LCSH.</li>
-          <li>Una coincidencia en BNE, Wikidata, DBpedia, LCSH, UNESCO o VIAF debe revisarse antes del registro final.</li>
-          <li>Si una fuente no responde o está saturada, el sistema lo indicará sin detener las demás fuentes.</li>
+          <li><strong>Exacta o término preferido:</strong> mejor candidato para revisión y uso.</li>
+          <li><strong>Parcial, variante o aproximada:</strong> comprueba el alcance antes de incorporarlo.</li>
+          <li>BNE se consulta sobre el índice oficial publicado por <a href="https://bnelab.bne.es/dato/catalogo-de-autoridades/" target="_blank" rel="noopener noreferrer">BNElab</a>.</li>
+          <li>EuroVoc y UNESCO aportan términos controlados multilingües; Wikidata ayuda a construir variantes de búsqueda.</li>
+          <li>“Usar autoridad” transfiere el término, URI, indicadores y código de fuente a la etiqueta 650; Koha no guarda automáticamente.</li>
         </ul>
       </div>
     </aside>
