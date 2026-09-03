@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: topicia
+    env: node
+    plan: free
+    buildCommand: npm install && python3 -m pip install --user --break-system-packages -r requirements.txt
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: OPENAI_MODEL
+        value: gpt-5.5
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PYTHON_BIN
+        value: python3
+      - key: AUTHORITY_SOURCES
+        value: lcsh,bne,unesco,wikidata,viaf,dbpedia
+      - key: DBPEDIA_ENABLE_SPARQL
+        value: false
+      - key: ALLOWED_ORIGINS
+        value: "*"

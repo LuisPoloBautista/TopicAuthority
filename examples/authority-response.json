@@ -1,0 +1,26 @@
+{
+  "topic": "Botánica mexicana del siglo XVIII",
+  "authorities": [
+    {
+      "source": "VIAF",
+      "label": "Ejemplo de autoridad VIAF",
+      "term": "Ejemplo de autoridad VIAF",
+      "url": "https://viaf.org/viaf/...",
+      "uri": "https://viaf.org/viaf/...",
+      "type": "Autoridad",
+      "description": "Fuentes enlazadas cuando VIAF las devuelve",
+      "match": "partial"
+    },
+    {
+      "source": "Wikidata",
+      "label": "botánica",
+      "term": "botánica",
+      "url": "https://www.wikidata.org/wiki/Q441",
+      "uri": "https://www.wikidata.org/wiki/Q441",
+      "id": "Q441",
+      "type": "Entidad relacionada",
+      "description": "ciencia que estudia las plantas",
+      "match": "related"
+    }
+  ]
+}
