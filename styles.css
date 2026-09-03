@@ -211,6 +211,7 @@ h2 {
 }
 
 input[type="file"],
+input[type="text"],
 textarea {
   width: 100%;
   padding: 12px 14px;
@@ -225,6 +226,7 @@ textarea {
 }
 
 input[type="file"]:focus,
+input[type="text"]:focus,
 textarea:focus {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px rgba(241, 101, 47, 0.14);
@@ -408,14 +410,24 @@ button:hover {
   color: #b91c1c;
 }
 
-.koha-context {
+.authority-query {
   padding: 16px;
   border: 1px solid #fdba74;
   border-radius: 8px;
   background: #fff7ed;
 }
 
-.koha-context p {
+.authority-query label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.authority-query input {
+  margin-bottom: 12px;
+}
+
+.authority-query p {
   margin: 0 0 12px;
 }
 

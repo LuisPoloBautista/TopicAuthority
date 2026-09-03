@@ -6,10 +6,10 @@ const output = document.getElementById("output");
 const dropZone = document.getElementById("dropZone");
 const sidebar = document.getElementById("infoSidebar");
 const sidebarToggle = document.getElementById("sidebarToggle");
-const kohaContextBlock = document.getElementById("kohaContextBlock");
 const kohaContextMessage = document.getElementById("kohaContextMessage");
 const analyzeKohaBtn = document.getElementById("analyzeKohaBtn");
-const searchExistingBtn = document.getElementById("searchExistingBtn");
+const authorityTermInput = document.getElementById("authorityTermInput");
+const searchAuthorityBtn = document.getElementById("searchAuthorityBtn");
 
 let kohaParentOrigin = null;
 let kohaContext = null;
@@ -213,15 +213,13 @@ async function searchOneTopic(topic) {
 function receiveKohaContext(context, origin) {
   kohaParentOrigin = origin;
   kohaContext = context || {};
-  kohaContextBlock.hidden = false;
   const existing = String(kohaContext.existingTerm || "").trim();
-  searchExistingBtn.hidden = !existing;
   analyzeKohaBtn.hidden = !String(kohaContext.marcText || "").trim();
+  authorityTermInput.value = existing;
   kohaContextMessage.textContent = existing
-    ? `Término 650 detectado: ${existing}`
-    : "Se recibieron los campos bibliográficos anteriores del formulario. Puede analizarlos para sugerir materias verificadas.";
+    ? `Koha proporcionó el término de la etiqueta 650: ${existing}`
+    : "Koha proporcionó el contexto bibliográfico. Escriba un término o genere sugerencias desde los campos MARC.";
   if (existing) searchOneTopic(existing);
-  else if (kohaContext.marcText) analyzeText(kohaContext.marcText);
 }
 
 async function loadAuthoritiesForTopic(topic, card) {
@@ -303,7 +301,21 @@ processTextBtn.addEventListener("click", async () => {
 });
 
 analyzeKohaBtn?.addEventListener("click", () => analyzeText(String(kohaContext?.marcText || "")));
-searchExistingBtn?.addEventListener("click", () => searchOneTopic(String(kohaContext?.existingTerm || "")));
+searchAuthorityBtn?.addEventListener("click", () => {
+  const term = authorityTermInput.value.trim();
+  if (!term) {
+    authorityTermInput.focus();
+    output.textContent = "Escribe un término de materia para buscarlo.";
+    return;
+  }
+  searchOneTopic(term);
+});
+authorityTermInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    searchAuthorityBtn.click();
+  }
+});
 
 window.addEventListener("message", (event) => {
   if (event.source !== window.parent || event.data?.type !== "TOPIC_AUTHORITY_KOHA_CONTEXT") return;

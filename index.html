@@ -29,17 +29,19 @@
         Estructura: Encabezamiento principal - subdivisión de materia - subdivisión geográfica - subdivisión cronológica - subdivisión de forma.
       </div>
 
-      <div class="block koha-context" id="kohaContextBlock" hidden>
-        <h2>Contexto del registro de Koha</h2>
-        <p id="kohaContextMessage"></p>
+      <div class="block authority-query" id="authorityQueryBlock">
+        <h2>1) Escribe o revisa el término de materia</h2>
+        <label for="authorityTermInput">Tema o encabezamiento 650</label>
+        <input id="authorityTermInput" type="text" placeholder="Ejemplo: Inteligencia artificial -- Aspectos éticos" autocomplete="off" />
         <div class="koha-actions">
-          <button id="analyzeKohaBtn" type="button">Analizar campos MARC anteriores</button>
-          <button id="searchExistingBtn" type="button" hidden>Buscar autoridad del término 650</button>
+          <button id="searchAuthorityBtn" type="button">Buscar en autoridades</button>
+          <button id="analyzeKohaBtn" type="button" hidden>Obtener sugerencias desde los campos MARC</button>
         </div>
+        <p id="kohaContextMessage" class="query-help">Escribe un término para buscar su forma autorizada en LC, BNE, UNESCO y otras fuentes.</p>
       </div>
 
       <div class="block">
-        <h2>1) Importa un PDF</h2>
+        <h2>2) Importa un PDF</h2>
         <div id="dropZone" class="drop-zone">
           <p>Arrastra y suelta un PDF aquí o haz clic para seleccionar</p>
           <input type="file" id="pdfInput" accept="application/pdf" style="display: none;" />
@@ -49,7 +51,7 @@
       </div>
 
       <div class="block">
-        <h2>2) O pega un texto</h2>
+        <h2>3) O analiza otro texto</h2>
         <textarea id="textInput" rows="6" placeholder="Pega aquí tu texto o resumen"></textarea>
         <br/><br/>
         <button id="processTextBtn">Procesar texto</button>

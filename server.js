@@ -47,16 +47,16 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname)));
 
 function buildTopicPrompt(text) {
-  return `Eres un experto catalogador bibliotecario. Analiza el siguiente contenido y genera 10 encabezamientos de materia en formato LEMB (Lista de Encabezamientos de Materia para Bibliotecas).
+  return `Eres un experto catalogador bibliotecario. Analiza el siguiente contenido y genera entre 5 y 7 candidatos concisos de encabezamientos de materia MARC 650.
 
-Para cada tema, usa esta estructura cuando aplique:
+Usa vocabulario controlado habitual de LCSH, Encabezamientos de materia de la BNE y Tesauro UNESCO. No inventes subdivisiones para hacer el termino mas especifico. Agrega una subdivision solo cuando este claramente respaldada por el contenido y sea de uso bibliotecario:
 - Encabezamiento principal
 - -- Subdivision de materia
 - -- Subdivision geografica
 - -- Subdivision cronologica
 - -- Subdivision de forma
 
-Devuelve UNICAMENTE un arreglo JSON de strings, sin markdown ni explicaciones. Cada string debe contener un encabezamiento completo.
+Prefiere conceptos nucleares que tengan alta probabilidad de existir en un vocabulario de autoridad. Una sugerencia de IA no es una autoridad validada. Devuelve UNICAMENTE un arreglo JSON de strings, sin markdown ni explicaciones.
 
 Texto a analizar:
 ${text}`;

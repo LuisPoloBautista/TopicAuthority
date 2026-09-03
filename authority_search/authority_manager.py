@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .dbpedia import has_dbpedia_exact_hint, search_dbpedia
 from .bne import search_bne
@@ -218,46 +219,52 @@ def search(topic, sources=None):
     selected_sources = sources or configured_sources()
     selected_sources = [source for source in selected_sources if source in SEARCHERS]
     plan = query_plan(topic)
-    expanded_plan = expand_plan_with_wikidata(plan) if selected_sources else plan
+    primary_plan = [item for item in plan if item.get("priority") == 0] or plan[:1]
+    needs_multilingual_variants = any(source in {"lcsh", "dbpedia", "unesco"} for source in selected_sources)
+    expanded_plan = expand_plan_with_wikidata(primary_plan) if needs_multilingual_variants else primary_plan
     bne_plan = [
         {
             "term": strip_numbering(normalize_spaces(topic)),
             "role": "encabezamiento completo BNE",
             "priority": -10,
         }
-    ] + plan
+    ] + primary_plan
     per_source_limit = int(os.getenv("AUTHORITY_MAX_RESULTS_PER_SOURCE", os.getenv("AUTHORITY_MAX_RESULTS", "3")))
 
-    for source in selected_sources:
+    def run_source(source):
         searcher = SEARCHERS.get(source)
         if not searcher:
-            continue
+            return source, [], None
+        if source == "bne":
+            source_plan = bne_plan
+        elif source in {"wikidata", "viaf"}:
+            source_plan = primary_plan
+        else:
+            source_plan = expanded_plan
         try:
-            if source == "bne":
-                source_plan = bne_plan
-            elif source in {"wikidata", "viaf"}:
-                source_plan = plan
-            else:
-                source_plan = expanded_plan
-            source_results = search_source_for_topic(source, searcher, source_plan, per_source_limit)
-            authorities.extend(normalize_result(item) for item in source_results)
-            source_status.append(
-                {
-                    "source": SOURCE_LABELS.get(source, source),
-                    "status": "ok" if source_results else "no_matches",
-                    "count": len(source_results),
-                }
-            )
+            return source, search_source_for_topic(source, searcher, source_plan, per_source_limit), None
         except Exception as exc:
-            logging.warning("Authority source %s failed for topic %r: %s", source, topic, exc)
-            source_status.append(
-                {
-                    "source": SOURCE_LABELS.get(source, source),
-                    "status": "error",
-                    "count": 0,
-                    "error": str(exc),
-                }
-            )
+            return source, [], exc
+
+    completed = {}
+    with ThreadPoolExecutor(max_workers=max(1, len(selected_sources))) as executor:
+        futures = [executor.submit(run_source, source) for source in selected_sources]
+        for future in as_completed(futures):
+            source, source_results, error = future.result()
+            completed[source] = (source_results, error)
+
+    for source in selected_sources:
+        source_results, error = completed.get(source, ([], None))
+        authorities.extend(normalize_result(item) for item in source_results)
+        status = {
+            "source": SOURCE_LABELS.get(source, source),
+            "status": "error" if error else ("ok" if source_results else "no_matches"),
+            "count": len(source_results),
+        }
+        if error:
+            logging.warning("Authority source %s failed for topic %r: %s", source, topic, error)
+            status["error"] = str(error)
+        source_status.append(status)
 
     seen = set()
     unique = []

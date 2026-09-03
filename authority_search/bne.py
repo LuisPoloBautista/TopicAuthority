@@ -242,9 +242,30 @@ def search_bne(term, limit=DEFAULT_LIMIT):
     if not query:
         return []
 
+    # The official BNE dump contains hundreds of thousands of headings. Reduce
+    # the RapidFuzz search space to labels sharing a meaningful token/prefix.
+    # This keeps fuzzy matching useful without scoring the complete dump on
+    # every web request (especially expensive on small Render instances).
+    stopwords = {"para", "como", "desde", "entre", "sobre", "materia", "forma"}
+    tokens = [token for token in re.findall(r"[a-z0-9]+", query) if len(token) >= 4 and token not in stopwords]
+    probes = sorted(set(tokens), key=len, reverse=True)[:4]
+    candidate_indexes = [
+        index for index, label in enumerate(choices)
+        if any(probe in label for probe in probes)
+    ] if probes else []
+    if not candidate_indexes and probes:
+        prefixes = [probe[:5] for probe in probes if len(probe) >= 5]
+        candidate_indexes = [
+            index for index, label in enumerate(choices)
+            if any(prefix in label for prefix in prefixes)
+        ]
+
+    search_indexes = candidate_indexes or range(len(choices))
+    search_choices = [choices[index] for index in search_indexes]
+
     matches = process.extract(
         query,
-        choices,
+        search_choices,
         scorer=fuzz.WRatio,
         limit=max(limit * 8, 20),
         score_cutoff=BNE_SCORE_CUTOFF,
@@ -252,7 +273,8 @@ def search_bne(term, limit=DEFAULT_LIMIT):
 
     results = []
     seen = set()
-    for _, score, index in matches:
+    for _, score, candidate_index in matches:
+        index = search_indexes[candidate_index]
         entry = entries[index]
         coverage, token_count = _token_coverage(term, entry["search_label"])
         adjusted_score = score
