@@ -1,4 +1,5 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 from .http_utils import DEFAULT_LIMIT, compact, get_json, text_match
 
@@ -60,6 +61,11 @@ def _search_language(term, language, limit):
 def _entity_details(entity_ids):
     if not entity_ids:
         return {}
+    if len(entity_ids) > 50:
+        entities = {}
+        for start in range(0, len(entity_ids), 50):
+            entities.update(_entity_details(entity_ids[start:start + 50]))
+        return entities
     data = get_json(
         WIKIDATA_API_URL,
         {
@@ -123,7 +129,7 @@ def _is_noisy_work(description):
 
 
 def search_wikidata(term, limit=DEFAULT_LIMIT):
-    cache_key = term.lower().strip()
+    cache_key = (term.casefold().strip(), limit, tuple(wikidata_languages()))
     if cache_key in _SEARCH_CACHE:
         return _SEARCH_CACHE[cache_key][:limit]
 
@@ -131,18 +137,26 @@ def search_wikidata(term, limit=DEFAULT_LIMIT):
     found = []
     seen_ids = set()
     candidate_limit = max(result_limit * 4, result_limit, 10)
-    for language in wikidata_languages():
-        for item in _search_language(term, language, min(candidate_limit, 50)):
+    languages = wikidata_languages()
+    failures = []
+    responses = []
+    with ThreadPoolExecutor(max_workers=max(1, min(7, len(languages)))) as executor:
+        futures = [(language, executor.submit(_search_language, term, language, min(candidate_limit, 50))) for language in languages]
+        for language, future in futures:
+            try:
+                responses.append((language, future.result()))
+            except Exception as exc:
+                failures.append(exc)
+    if failures and not responses:
+        raise failures[0]
+    for language, items in responses:
+        for item in items:
             entity_id = item.get("id", "")
             if not entity_id or entity_id in seen_ids:
                 continue
             seen_ids.add(entity_id)
             item["_search_language"] = language
             found.append(item)
-            if len(found) >= candidate_limit:
-                break
-        if len(found) >= candidate_limit:
-            break
 
     details = _entity_details([item.get("id", "") for item in found])
     results = []
@@ -154,7 +168,10 @@ def search_wikidata(term, limit=DEFAULT_LIMIT):
         if variants and text_match(term, label) == "related":
             label = variants[0]
         description = _description_for_item(item, entity)
-        if _is_noisy_work(description):
+        matched_text = item.get("match", {}).get("text", "")
+        matches = [text_match(term, value) for value in [label, matched_text, *variants] if value]
+        match = "exact" if "exact" in matches else ("partial" if "partial" in matches else "related")
+        if match == "related" or _is_noisy_work(description):
             continue
         results.append(
             {
@@ -164,13 +181,12 @@ def search_wikidata(term, limit=DEFAULT_LIMIT):
                 "url": item.get("concepturi") or f"https://www.wikidata.org/wiki/{entity_id}",
                 "description": description,
                 "type": "Entidad relacionada",
-                "match": item.get("match", {}).get("type", "related"),
+                "match": "alias" if match == "exact" and text_match(term, label) != "exact" else match,
                 "variants": variants,
                 "language": item.get("_search_language", ""),
             }
         )
-        if len(results) >= result_limit:
-            break
+    results.sort(key=lambda item: item["match"] not in {"exact", "alias"})
     _SEARCH_CACHE[cache_key] = results
     return results[:limit]
 
@@ -178,6 +194,8 @@ def search_wikidata(term, limit=DEFAULT_LIMIT):
 def get_wikidata_variants(term, limit=3):
     variants = []
     for item in search_wikidata(term, limit=limit):
+        if item.get("match") not in {"exact", "alias"}:
+            continue
         variants.extend(item.get("variants") or [])
 
     unique = []

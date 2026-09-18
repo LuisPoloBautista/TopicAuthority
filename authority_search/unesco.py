@@ -10,26 +10,29 @@ UNESCO_SPARQL_URL = os.getenv(
 
 
 def search_unesco(term, limit=DEFAULT_LIMIT):
-    lang = os.getenv("AUTHORITY_LANGUAGE", "es")
     term_literal = json.dumps(term.lower(), ensure_ascii=False)
     query = f"""
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-SELECT ?uri ?label ?description WHERE {{
-  ?uri skos:prefLabel ?label .
-  FILTER(lang(?label) = "{lang}" || lang(?label) = "en")
-  FILTER(CONTAINS(LCASE(STR(?label)), {term_literal}))
-  OPTIONAL {{ ?uri skos:scopeNote ?description . }}
+SELECT DISTINCT ?uri ?label ?matchedLabel WHERE {{
+  ?uri skos:prefLabel ?label ; (skos:prefLabel|skos:altLabel) ?matchedLabel .
+  FILTER(lang(?label) = lang(?matchedLabel))
+  FILTER(CONTAINS(LCASE(STR(?matchedLabel)), {term_literal}))
 }}
-LIMIT {int(limit)}
+ORDER BY DESC(LCASE(STR(?matchedLabel)) = {term_literal}) STRLEN(STR(?matchedLabel))
+LIMIT {int(limit) * 5}
 """
     data = sparql_json(UNESCO_SPARQL_URL, query)
     if data is None:
         raise RuntimeError("UNESCO no respondio a la consulta SPARQL")
     bindings = (data or {}).get("results", {}).get("bindings", [])
     results = []
-    for row in bindings[:limit]:
+    for row in bindings:
         label = row.get("label", {}).get("value", "")
         uri = row.get("uri", {}).get("value", "")
+        matched = row.get("matchedLabel", {}).get("value", label)
+        match = text_match(term, matched)
+        if match == "exact" and text_match(term, label) != "exact":
+            match = "alias"
         results.append(
             {
                 "source": "UNESCO",
@@ -38,7 +41,11 @@ LIMIT {int(limit)}
                 "url": uri,
                 "type": "Tesauro",
                 "description": compact(row.get("description", {}).get("value", "")),
-                "match": text_match(term, label),
+                "match": match,
             }
         )
-    return results
+    unique = {}
+    for item in results:
+        if item["match"] != "related":
+            unique.setdefault(item["uri"], item)
+    return list(unique.values())[:limit]

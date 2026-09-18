@@ -118,7 +118,7 @@ GET /api/topics/{topic}/authorities
 | `OPENAI_MODEL` | `gpt-5.5` | Modelo usado para generar temas. |
 | `OPENAI_TIMEOUT_MS` | `120000` | Timeout de OpenAI. |
 | `PORT` | `3000` | Puerto del servidor. |
-| `PYTHON_BIN` | `python3` | Ejecutable usado para llamar el modulo Python. |
+| `PYTHON_BIN` | `.venv` local, si existe; de lo contrario `python` en Windows o `python3` | Ejecutable usado para llamar el modulo Python. |
 | `AUTHORITY_SOURCES` | `lcsh,bne,unesco,eurovoc,wikidata,viaf,dbpedia` | Fuentes habilitadas, priorizando LC y vocabularios multilingues en espanol. |
 | `AUTHORITY_TIMEOUT_SECONDS` | `5` | Timeout por consulta externa. |
 | `AUTHORITY_MAX_RESULTS` | `3` | Resultados maximos por fuente. |

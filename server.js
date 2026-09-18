@@ -23,7 +23,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const OPENAI_RESPONSES_URL = process.env.OPENAI_RESPONSES_URL || 'https://api.openai.com/v1/responses';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.5';
-const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
+const localPython = path.join(__dirname, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+const PYTHON_BIN = process.env.PYTHON_BIN || (existsSync(localPython) ? localPython : (process.platform === 'win32' ? 'python' : 'python3'));
 const AUTHORITY_CLI_TIMEOUT_MS = Number(process.env.AUTHORITY_CLI_TIMEOUT_MS || 45000);
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
@@ -144,7 +145,7 @@ async function searchAuthorities(topic) {
         cwd: __dirname,
         timeout: AUTHORITY_CLI_TIMEOUT_MS,
         maxBuffer: 1024 * 1024,
-        env: process.env,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
       },
     );
     if (stderr) console.warn(stderr.trim());

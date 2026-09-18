@@ -187,6 +187,8 @@ def score_result(query, item):
 
 def search_source_for_topic(source, searcher, plan, per_source_limit):
     collected = []
+    errors = []
+    successful_queries = 0
     source_plan = plan
     if source == "viaf":
         source_plan = [item for item in plan if item["priority"] == 0]
@@ -194,14 +196,20 @@ def search_source_for_topic(source, searcher, plan, per_source_limit):
         hint_plan = [item for item in plan if has_dbpedia_exact_hint(item["term"])]
         source_plan = hint_plan or [item for item in plan if item["priority"] <= 10]
 
-    for component in sorted(source_plan, key=lambda item: item["priority"]):
+    ordered_plan = sorted(source_plan, key=lambda item: item["priority"])
+    workers = 1 if source == "bne" else max(1, min(4, len(ordered_plan)))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        pending = [(component, executor.submit(searcher, component["term"], limit=per_source_limit)) for component in ordered_plan]
+        responses = []
+        for component, future in pending:
+            try:
+                responses.append((component, future.result()))
+                successful_queries += 1
+            except Exception as exc:
+                errors.append(exc)
+    for component, results in responses:
         term = component["term"]
         accepted_for_component = 0
-        try:
-            results = searcher(term, limit=per_source_limit)
-        except TypeError:
-            results = searcher(term)
-
         for result in results:
             relevance = score_result(term, result)
             if relevance < 70:
@@ -219,8 +227,14 @@ def search_source_for_topic(source, searcher, plan, per_source_limit):
         if component["priority"] == 0 and accepted_for_component and source not in {"dbpedia", "bne", "lcsh"}:
             break
 
+    if errors and not successful_queries:
+        raise errors[0]
     collected.sort(key=lambda item: item.get("score", 0), reverse=True)
-    return collected[:per_source_limit]
+    unique = {}
+    for item in collected:
+        key = item.get("uri") or item.get("url") or item.get("label")
+        unique.setdefault(key, item)
+    return list(unique.values())[:per_source_limit]
 
 
 def search(topic, sources=None):
