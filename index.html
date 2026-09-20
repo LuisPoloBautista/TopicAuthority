@@ -22,7 +22,7 @@
         <p>Busca, valida y transfiere términos controlados para la etiqueta 650 de Koha.</p>
       </header>
 
-      <p class="intro">Escribe un encabezamiento de materia o utiliza el contexto bibliográfico de Koha. La herramienta consulta vocabularios controlados y permite incorporar la autoridad seleccionada al formulario MARC.</p>
+      <p class="intro">Escribe un encabezamiento de materia o utiliza el contexto bibliográfico de Koha. Busca encabezamientos usados anteriormente para normalizar su uso. Puedes revisar otros catálogos manualmente o consultarlos desde la app.</p>
       
       <div class="lemb-info">
         <strong>Verificación de autoridades:</strong> las sugerencias generadas por IA son candidatos, no autoridades confirmadas. Utiliza preferentemente resultados exactos o términos preferidos de LCSH, BNE, UNESCO y EuroVoc.
@@ -33,9 +33,10 @@
         <label for="authorityTermInput">Tema o encabezamiento 650</label>
         <input id="authorityTermInput" type="text" placeholder="Ejemplo: Inteligencia artificial -- Aspectos éticos" autocomplete="off" />
         <div class="koha-actions">
-          <button id="searchAuthorityBtn" type="button">Buscar en otros catálogos de autoridades y vocabularios controlados internacionales en línea</button>
+          <button id="searchAuthorityBtn" type="button">Buscar en el historial local</button>
           <button id="analyzeKohaBtn" type="button" hidden>Obtener sugerencias desde los campos MARC</button>
         </div>
+        <div id="catalogLinks" class="catalog-links"></div>
         <p id="kohaContextMessage" class="query-help">Escribe un término para localizar formas autorizadas y equivalencias multilingües.</p>
       </div>
 
@@ -46,18 +47,12 @@
           <input type="file" id="pdfInput" accept="application/pdf" style="display: none;" />
         </div>
         <br/>
-        <button id="processPdfBtn">Analizar PDF y buscar autoridades</button>
+        <button id="processPdfBtn">Generar 5 sugerencias desde el PDF</button>
       </div>
 
       <div class="block">
-        <h2>3) Generar sugerencias desde un texto</h2>
-        <textarea id="textInput" rows="6" placeholder="Pega un resumen, tabla de contenido o descripción temática"></textarea>
-        <br/><br/>
-        <button id="processTextBtn">Analizar texto y buscar autoridades</button>
-      </div>
-
-      <div class="block">
-        <h2>Autoridades encontradas</h2>
+        <h2>Encabezamientos y coincidencias</h2>
+        <p><a href="/api/used-headings.js" download="used-headings.js">Descargar historial de uso (.js)</a></p>
         <div id="output">Escribe un término, utiliza el contexto de Koha o analiza un documento.</div>
       </div>
     </main>
@@ -78,6 +73,6 @@
     </aside>
   </div>
 
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>

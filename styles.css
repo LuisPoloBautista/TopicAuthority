@@ -468,6 +468,20 @@ button:hover {
   background: #166534;
 }
 
+[hidden] { display: none !important; }
+button:disabled { opacity: 0.6; cursor: wait; transform: none; }
+.catalog-links { margin: 14px 0; overflow-wrap: anywhere; }
+.catalog-links a { color: var(--brand-dark); font-weight: 600; }
+.duplicate-warning { padding: 12px; background: #fef3c7; color: #78350f; border-radius: 8px; }
+.history-match { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.topic-card { overflow-wrap: anywhere; }
+
+@media (max-width: 600px) {
+  .container { padding: 16px; }
+  .hero h1 { font-size: 1.6rem; }
+  .koha-actions button { width: 100%; }
+}
+
 @media (max-width: 1200px) {
   .app-shell {
     width: 96%;

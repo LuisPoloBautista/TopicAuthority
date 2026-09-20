@@ -1,28 +1,39 @@
 # topicIA
 
-Asistente de indizacion que recibe un PDF o texto, genera encabezamientos de materia con la API de OpenAI y compara autoridades BNE locales mas catalogos externos para encontrar equivalencias directas.
+Asistente de indización para Koha: genera cinco propuestas desde los campos MARC anteriores a 650 o desde un PDF, busca encabezamientos usados anteriormente y permite revisar autoridades externas.
 
 ## Flujo
 
 ```text
-Documento o texto
-  -> OpenAI genera temas
-  -> authority_search compara BNE local y consulta fuentes externas
-  -> la interfaz muestra equivalencias por tema
+650$a vacío -> sugerir 5 encabezamientos desde MARC o PDF
+650$a con información -> conservarlo y sugerir subdivisiones desde MARC o PDF
+  -> máximo 2 subdivisiones por propuesta ($x, $y, $z, $v)
+  -> comprobar historial local, advertir coincidencias e importar una forma usada
+  -> consultar manualmente UNESCO, Wikidata o LCSH, o buscar desde la app
+  -> transferir a Koha -> guardar registro -> verificar MARCXML -> contabilizar uso
 ```
 
 ## Integracion con Koha
 
-Cuando la aplicacion se abre con `?koha=1` dentro del modal del staff, recibe
-por `postMessage` el contexto bibliografico del formulario. Si la etiqueta 650
-esta vacia, analiza los campos MARC anteriores y genera sugerencias; si ya tiene
-contenido, busca directamente ese encabezamiento. Cada resultado muestra
-`Usar autoridad`, que devuelve a Koha la forma autorizada, su URI y el codigo
-MARC de la fuente cuando existe.
+El integrador actualizado está incluido en este repositorio: [`docs/topic-authority-koha-integration.js`](docs/topic-authority-koha-integration.js). Reemplaza la versión anterior de TopicAuthority en `IntranetUserJS`, después del integrador principal de MARC21. No pegues ambas versiones. Ajusta `AUTHORITY_ORIGIN` al origen del servidor si es diferente del configurado.
 
-El script que crea el boton junto a las etiquetas 650 se encuentra en el
-proyecto MARC21, en `docs/topic-authority-koha-integration.js`, y debe pegarse
-despues del integrador principal en `IntranetUserJS`.
+El botón **Ampliar ventana / Restaurar tamaño** está en la cabecera del modal de Koha. La app recibe `existingMain`, `existingTerm`, `targetId` y `marcText` por `postMessage`. No genera ni consulta catálogos externos automáticamente: el usuario elige la acción. Sí comprueba el historial al mostrar propuestas de IA y nuevamente antes de transferirlas, incluso si no se pulsó «Buscar».
+
+Las propuestas nuevas usan indicador 2 = `4` (fuente no especificada), sin URI ni código de autoridad inventados. Las subdivisiones se transfieren a sus subcampos, conservando el orden y las repeticiones. Si falta un subcampo o una ocurrencia en el framework, la transferencia se detiene antes de modificar el formulario y avisa cuál agregar. Los resultados externos conservan el tratamiento de fuente de la versión anterior; el catalogador debe revisar su alcance antes de importarlos.
+
+La selección no cuenta como uso. El integrador conserva provisionalmente la selección en la pestaña, detecta el envío del formulario y, al llegar a `detail.pl`, `MARCdetail.pl` o `additem.pl`, consulta el MARCXML guardado mediante `catalogue/export.pl`. Solo sincroniza encabezamientos presentes en ese MARC. Un guardado repetido del mismo registro no suma usos; retirar un encabezamiento y guardar actualiza su contador. El contador representa **registros distintos que usan el encabezamiento**, no clics ni consultas. Los registros ajenos a este flujo y las eliminaciones completas desde otras pantallas no se sincronizan automáticamente.
+
+Si falla la verificación o el servidor de historial, aparece un aviso con **Reintentar sincronización**. Los datos pendientes caducan a los 30 minutos y no se contabilizan al cancelar la edición. Koha necesita permitir la exportación MARCXML al usuario del staff. El flujo completo debe comprobarse en la instalación de Koha antes de ponerlo en producción.
+
+## Historial de encabezamientos
+
+`heading-store.js` administra el historial compartido. Se persiste como datos JSON en `data/used-headings.json`, sin ejecutar contenido introducido por usuarios. La app ofrece **Descargar historial de uso (.js)**: `/api/used-headings.js` entrega un módulo JavaScript `export default [...]` con encabezamientos, subdivisiones, fecha y contador. No incluye identificadores internos de registros.
+
+La búsqueda normaliza mayúsculas, acentos, espacios y puntuación final para recuperar formas usadas, conservando su escritura original. Las subdivisiones y sus códigos forman parte de la identidad del encabezamiento. Si no hay coincidencia completa se muestran variantes del mismo encabezamiento principal. El historial local no equivale a una autoridad validada por una institución externa.
+
+Configura `HEADING_STORE_PATH` en un **disco persistente**, por ejemplo `/var/data/topic-authority/used-headings.json`, para conservarlo al desplegar de nuevo. El `render.yaml` existente usa un plan gratuito sin disco persistente: el almacenamiento local de ese despliegue no garantiza conservar el historial. Ejecuta una sola instancia Node con este almacenamiento; para varias instancias hace falta una base de datos compartida. Respalda el JSON para conservar también la contabilidad por registro; la descarga JS contiene únicamente las entradas públicas.
+
+Las búsquedas manuales abren el término codificado en [UNESCO](https://vocabularies.unesco.org/unesco/es/search), [Wikidata](https://www.wikidata.org/wiki/Special:Search) y [LCSH](https://id.loc.gov/search/). La consulta dentro de la app reutiliza los conectores HTTP existentes; no se agregó un cliente Z39.50.
 
 No usa embeddings, bases vectoriales ni entrenamiento. BNE se compara localmente con RapidFuzz a partir de los archivos descargados del Catalogo de autoridades de BNE Lab: https://bnelab.bne.es/dato/catalogo-de-autoridades/. Las demas equivalencias se obtienen mediante consultas directas a fuentes externas.
 
@@ -76,11 +87,15 @@ Respuesta:
 
 ```json
 {
-  "result": "Botanica mexicana -- Siglo XVIII",
-  "topics": ["Botanica mexicana -- Siglo XVIII"],
-  "raw": "[\"Botanica mexicana -- Siglo XVIII\"]"
+  "result": "Educación -- México\n...",
+  "topics": ["Educación -- México", "..."],
+  "headings": [{"main": "Educación", "subdivisions": [{"code": "z", "value": "México"}], "label": "Educación -- México"}]
 }
 ```
+
+El ejemplo de respuesta está abreviado: una respuesta satisfactoria tiene exactamente cinco propuestas y como máximo dos subdivisiones por propuesta. Envía `existingMain` junto a `text` para conservar el 650$a existente. Si el modelo incumple la estructura, la app muestra un error para reintentar; no inventa propuestas para completar el cupo.
+
+Historial: `GET /api/headings?q=Educación` devuelve `{ "headings": [...] }`. Tras verificar el registro guardado, el integrador envía `POST /api/heading-usage` con `{ "confirmed": true, "recordId": "https://koha.example:123", "headings": [...] }`. Es una instantánea de los encabezamientos locales presentes en ese registro; los reintentos son idempotentes. Este endpoint confía en el integrador del staff, no autentica por sí solo una sesión Koha: restringe el acceso de red al servicio y configura `ALLOWED_ORIGINS` para los orígenes del staff (CORS no sustituye autenticación).
 
 Buscar autoridades:
 
@@ -135,6 +150,7 @@ GET /api/topics/{topic}/authorities
 | `BNE_LOCAL_SCORE_CUTOFF` | `74` | Puntaje minimo de RapidFuzz para aceptar una coincidencia BNE local. |
 | `BNE_INCLUDE_NT` | `false` | Si es `true`, tambien carga `materias.nt`. Por defecto se omite para mejorar tiempo de respuesta en Render. |
 | `ALLOWED_ORIGINS` | `*` | Origenes permitidos para CORS. |
+| `HEADING_STORE_PATH` | `data/used-headings.json` | Archivo de historial; requiere disco persistente y una sola instancia Node. |
 
 ## Instalacion local
 
@@ -155,7 +171,10 @@ Abre `http://localhost:3000`.
 
 ```bash
 python3 -m unittest discover -s tests
+npm test
 node --check server.js
+node --check script.js
+node --check docs/topic-authority-koha-integration.js
 ```
 
 ## Despliegue en Render

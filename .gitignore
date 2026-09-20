@@ -6,3 +6,5 @@ __pycache__/
 *.py[cod]
 doc_bne/materia-JSON.json
 doc_bne/materias.nt
+data/used-headings.json
+data/used-headings.json.tmp

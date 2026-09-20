@@ -1,7 +1,6 @@
+import { headingLabel } from "./headings.js";
 const pdfInput = document.getElementById("pdfInput");
 const processPdfBtn = document.getElementById("processPdfBtn");
-const textInput = document.getElementById("textInput");
-const processTextBtn = document.getElementById("processTextBtn");
 const output = document.getElementById("output");
 const dropZone = document.getElementById("dropZone");
 const sidebar = document.getElementById("infoSidebar");
@@ -13,6 +12,8 @@ const searchAuthorityBtn = document.getElementById("searchAuthorityBtn");
 
 let kohaParentOrigin = null;
 let kohaContext = null;
+let viewVersion = 0;
+const generatedHeadings = new Map();
 
 if (sidebarToggle && sidebar) {
   sidebarToggle.setAttribute("aria-expanded", String(!sidebar.classList.contains("collapsed")));
@@ -81,11 +82,11 @@ async function extractTextFromPdf(file) {
   return fullText.trim();
 }
 
-async function requestTopics(text) {
+async function requestTopics(text, existingMain = "") {
   const res = await fetch("/api/topics", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, existingMain }),
   });
 
   if (!res.ok) {
@@ -104,20 +105,101 @@ function topicsFromResponse(data) {
     .filter(Boolean);
 }
 
-function renderTopics(topics) {
-  const html = topics.map((topic, index) => `
-    <article class="topic-card" data-topic="${escapeHtml(topic)}">
-      <div class="topic-title">
-        <span class="topic-number">${index + 1}</span>
-        <span>${escapeHtml(topic)}</span>
+function catalogLinks(term) {
+  if (!term.trim()) return '';
+  const q = encodeURIComponent(term);
+  const links = {
+    UNESCO: `https://vocabularies.unesco.org/unesco/es/search?clang=es&q=${q}`,
+    Wikidata: `https://www.wikidata.org/w/index.php?title=Special:Search&search=${q}&uselang=es`,
+    LCSH: `https://id.loc.gov/search/?q=${q}&q=cs%3Ahttp%3A%2F%2Fid.loc.gov%2Fauthorities%2Fsubjects`
+  };
+  return '<span>Buscar manualmente:</span> ' + Object.entries(links).map(([name, url]) =>
+    `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${name}</a>`).join(' · ');
+}
+
+async function localMatches(term) {
+  const res = await fetch(`/api/headings?q=${encodeURIComponent(term)}`, { cache: 'no-store' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'No se pudo consultar el historial.');
+  return data.headings;
+}
+
+function sendHeading(heading) {
+  useAuthority({ ...heading, label: headingLabel(heading), source: 'Local', localHeading: heading });
+}
+
+async function showLocalMatches(card, heading, automatic = false) {
+  const container = card.querySelector('.local-results');
+  container.textContent = 'Consultando historial...';
+  try {
+    const matches = await localMatches(heading.label);
+    // A full heading may be new even when its main term has previous subdivisions.
+    const related = matches.length ? matches : await localMatches(heading.main);
+    container.replaceChildren();
+    const message = document.createElement('p');
+    message.className = related.length ? 'duplicate-warning' : '';
+    message.textContent = related.length
+      ? `${automatic ? 'Advertencia: ' : ''}Ya hay ${related.length} encabezamiento(s) coincidente(s) en el historial. Revisa e importa la forma usada para normalizarla.`
+      : 'No hay coincidencias en el historial. Puedes usarlo como nuevo.';
+    container.append(message);
+    for (const match of related) {
+      const row = document.createElement('div');
+      row.className = 'history-match';
+      const label = document.createElement('span');
+      label.textContent = `${match.label} — ${match.uses} registro(s) · ${match.exact ? 'Coincidencia exacta' : 'Encabezamiento relacionado'}`;
+      row.append(label);
+      if (kohaParentOrigin) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = 'Importar encabezamiento usado';
+        button.addEventListener('click', () => sendHeading(match));
+        row.append(button);
+      }
+      container.append(row);
+    }
+    card.dataset.historyChecked = 'true';
+    return related;
+  } catch (error) {
+    container.textContent = error.message + ' Reintenta la búsqueda antes de usarlo.';
+    throw error;
+  }
+}
+
+function renderTopics(headings, generated = false) {
+  const version = viewVersion;
+  output.innerHTML = '<div class="topic-list">' + headings.map((heading, index) => `
+    <article class="topic-card">
+      <div class="topic-title"><span class="topic-number">${index + 1}</span><span>${escapeHtml(heading.label)}</span></div>
+      ${generated ? `<p>Candidato de IA · ${escapeHtml(heading.subdivisions.map(p => '$' + p.code + ' ' + p.value).join(' · '))}</p>` : ''}
+      <div class="koha-actions">
+        <button type="button" class="search-local">Buscar en el historial</button>
+        ${(generated || heading.canUse) && kohaParentOrigin ? '<button type="button" class="use-new">Usar como nuevo</button>' : ''}
+        <button type="button" class="search-external">Consultar autoridades en la app</button>
       </div>
-      <div class="authority-section">
-        <strong>Comprobación en vocabularios controlados:</strong>
-        <div class="authority-results">Consultando fuentes de autoridad...</div>
-      </div>
-    </article>
-  `).join("");
-  output.innerHTML = `<div class="topic-list">${html}</div>`;
+      <div class="catalog-links">${catalogLinks(heading.label)}</div>
+      <div class="local-results" aria-live="polite"></div>
+      <div class="authority-results"></div>
+    </article>`).join('') + '</div>';
+  [...output.querySelectorAll('.topic-card')].forEach((card, index) => {
+    const heading = headings[index];
+    card.querySelector('.search-local').addEventListener('click', () => showLocalMatches(card, heading).catch(() => {}));
+    card.querySelector('.search-external').addEventListener('click', async (event) => {
+      event.target.disabled = true;
+      await loadAuthoritiesForTopic(heading.label, card);
+      event.target.disabled = false;
+    });
+    card.querySelector('.use-new')?.addEventListener('click', async (event) => {
+      event.target.disabled = true;
+      try {
+        const matches = await showLocalMatches(card, heading, true);
+        if (version !== viewVersion) return;
+        if (matches.length && !window.confirm('Ya existe un encabezamiento coincidente. Recomendamos importar la forma usada. ¿Deseas continuar con esta propuesta?')) return;
+        sendHeading(heading);
+      } catch { /* The inline error remains visible. */ }
+      finally { event.target.disabled = false; }
+    });
+    if (generated) showLocalMatches(card, heading, true).catch(() => {});
+  });
 }
 
 function sourcePriority(source) {
@@ -144,7 +226,8 @@ function marcAuthority(item) {
     uri: item.uri || item.url || "",
     source,
     ind1: " ",
-    ind2: (map[source] || {}).ind2 || "7",
+    ind2: (map[source] || {}).ind2 || "4",
+    ...(item.localHeading ? { localHeading: item.localHeading, subfields: [{ code: "a", value: item.localHeading.main }, ...item.localHeading.subdivisions] } : {}),
     sourceCode: (map[source] || {}).sourceCode || ""
   };
 }
@@ -212,24 +295,39 @@ function renderAuthorities(container, authorities, sources = []) {
 
 async function searchOneTopic(topic) {
   if (!topic) return;
-  renderTopics([topic]);
-  await loadAuthorities([topic]);
+  viewVersion++;
+  const previous = generatedHeadings.get(topic)
+    || (kohaContext?.existingHeading && headingLabel(kohaContext.existingHeading) === topic ? kohaContext.existingHeading : null);
+  const heading = previous
+    ? { ...previous, label: topic, canUse: previous.subdivisions.length <= 2 }
+    : { main: topic.split(/\s*--\s*/)[0], label: topic, subdivisions: [], canUse: !topic.includes('--') };
+  renderTopics([heading]);
+  await showLocalMatches(output.querySelector('.topic-card'), heading).catch(() => {});
 }
 
 function receiveKohaContext(context, origin) {
+  const signature = JSON.stringify(context);
+  if (kohaParentOrigin === origin && JSON.stringify(kohaContext) === signature) return;
   kohaParentOrigin = origin;
   kohaContext = context || {};
-  const existing = String(kohaContext.existingTerm || "").trim();
-  analyzeKohaBtn.hidden = !String(kohaContext.marcText || "").trim();
-  authorityTermInput.value = existing;
-  kohaContextMessage.textContent = existing
-    ? `Koha proporcionó el término de la etiqueta 650: ${existing}`
-    : "Koha proporcionó el contexto bibliográfico. Escriba un término o genere sugerencias desde los campos MARC.";
-  if (existing) searchOneTopic(existing);
+  viewVersion++;
+  const existing = String(kohaContext.existingMain || kohaContext.existingTerm?.split(/\s*--\s*/)[0] || '').trim();
+  analyzeKohaBtn.hidden = !String(kohaContext.marcText || '').trim();
+  analyzeKohaBtn.textContent = existing ? 'Sugerir subdivisiones desde los campos MARC' : 'Sugerir 5 encabezamientos desde los campos MARC';
+  authorityTermInput.value = kohaContext.existingTerm || existing;
+  updateCatalogLinks();
+  output.textContent = existing ? 'Busca este encabezamiento en el historial o solicita subdivisiones basadas en el registro.' : 'Genera encabezamientos a partir de los campos MARC o de un PDF.';
+  kohaContextMessage.textContent = existing ? `650$a: ${existing}. Se conservará el encabezamiento principal al sugerir subdivisiones.` : '650$a vacío: se propondrán cinco encabezamientos con hasta dos subdivisiones.';
 }
+
+function updateCatalogLinks() {
+  document.getElementById('catalogLinks').innerHTML = catalogLinks(authorityTermInput.value.trim());
+}
+authorityTermInput.addEventListener('input', updateCatalogLinks);
 
 async function loadAuthoritiesForTopic(topic, card) {
   const container = card.querySelector(".authority-results");
+  container.textContent = 'Consultando catálogos de autoridades...';
   try {
     const res = await fetch(`/api/topics/${encodeURIComponent(topic)}/authorities`);
     if (!res.ok) {
@@ -243,34 +341,28 @@ async function loadAuthoritiesForTopic(topic, card) {
   }
 }
 
-async function loadAuthorities(topics) {
-  const cards = [...document.querySelectorAll(".topic-card")];
-  for (let index = 0; index < cards.length; index++) {
-    await loadAuthoritiesForTopic(topics[index], cards[index]);
-    await new Promise(resolve => setTimeout(resolve, 350));
-  }
-}
-
-async function analyzeText(sourceText) {
+async function analyzeText(sourceText, existingMain = "") {
   if (!sourceText) {
     output.textContent = "No hay texto para analizar.";
     return;
   }
 
-  output.textContent = "Identificando conceptos y verificándolos en vocabularios de autoridad...";
+  const version = ++viewVersion;
+  output.textContent = "Generando cinco propuestas con hasta dos subdivisiones...";
 
   try {
-    const data = await requestTopics(sourceText);
+    const data = await requestTopics(sourceText, existingMain);
+    if (version !== viewVersion) return;
     const topics = topicsFromResponse(data);
     if (!topics.length) {
       output.textContent = "No se pudieron identificar candidatos temáticos en el contenido proporcionado.";
       return;
     }
 
-    renderTopics(topics);
-    await loadAuthorities(topics);
+    data.headings.forEach(heading => generatedHeadings.set(heading.label, heading));
+    renderTopics(data.headings, true);
   } catch (error) {
-    output.textContent = `Error: ${error.message}`;
+    if (version === viewVersion) output.textContent = `Error: ${error.message}`;
   }
 }
 
@@ -283,30 +375,30 @@ processPdfBtn.addEventListener("click", async () => {
   }
 
   output.textContent = "Extrayendo texto del PDF...";
+  const version = ++viewVersion;
+  const existingMain = String(kohaContext?.existingMain || kohaContext?.existingTerm?.split(/\s*--\s*/)[0] || '');
+  processPdfBtn.disabled = true;
 
   try {
     const pdfText = await extractTextFromPdf(file);
+    if (version !== viewVersion) return;
     if (!pdfText) {
       output.textContent = "El PDF no contiene texto legible.";
       return;
     }
-    await analyzeText(pdfText);
+    await analyzeText(pdfText, existingMain);
   } catch (error) {
-    output.textContent = `Error leyendo PDF: ${error.message}`;
+    if (version === viewVersion) output.textContent = `Error leyendo PDF: ${error.message}`;
+  } finally {
+    processPdfBtn.disabled = false;
   }
 });
 
-processTextBtn.addEventListener("click", async () => {
-  const text = textInput.value.trim();
-  if (!text) {
-    output.textContent = "Ingresa texto para analizar.";
-    alert("Ingresa texto primero.");
-    return;
-  }
-  await analyzeText(text);
+analyzeKohaBtn?.addEventListener("click", async () => {
+  analyzeKohaBtn.disabled = true;
+  try { await analyzeText(String(kohaContext?.marcText || ''), String(kohaContext?.existingMain || kohaContext?.existingTerm?.split(/\s*--\s*/)[0] || '')); }
+  finally { analyzeKohaBtn.disabled = false; }
 });
-
-analyzeKohaBtn?.addEventListener("click", () => analyzeText(String(kohaContext?.marcText || "")));
 searchAuthorityBtn?.addEventListener("click", () => {
   const term = authorityTermInput.value.trim();
   if (!term) {
