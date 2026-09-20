@@ -1,13 +1,13 @@
 # topicIA
 
-Asistente de indización para Koha: genera cinco propuestas desde los campos MARC anteriores a 650 o desde un PDF, busca encabezamientos usados anteriormente y permite revisar autoridades externas.
+Asistente de indización para Koha: genera un encabezamiento con hasta dos subdivisiones desde MARC, o cinco propuestas temáticas desde un PDF, busca encabezamientos usados anteriormente y permite revisar autoridades externas.
 
 ## Flujo
 
 ```text
-650$a vacío -> sugerir 5 encabezamientos desde MARC o PDF
-650$a con información -> conservarlo y sugerir subdivisiones desde MARC o PDF
-  -> máximo 2 subdivisiones por propuesta ($x, $y, $z, $v)
+Espacio MARC: 650$a con información -> conservarlo + hasta 2 subdivisiones en total
+Espacio MARC: 650$a vacío -> 1 encabezamiento + hasta 2 subdivisiones
+Espacio PDF: 5 temas independientes del 650$a, hasta 2 subdivisiones por tema
   -> comprobar historial local, advertir coincidencias e importar una forma usada
   -> consultar manualmente UNESCO, Wikidata o LCSH, o buscar desde la app
   -> transferir a Koha -> guardar registro -> verificar MARCXML -> contabilizar uso
@@ -27,11 +27,11 @@ Si falla la verificación o el servidor de historial, aparece un aviso con **Rei
 
 ## Historial de encabezamientos
 
-`heading-store.js` administra el historial compartido. Se persiste como datos JSON en `data/used-headings.json`, sin ejecutar contenido introducido por usuarios. La app ofrece **Descargar historial de uso (.js)**: `/api/used-headings.js` entrega un módulo JavaScript `export default [...]` con encabezamientos, subdivisiones, fecha y contador. No incluye identificadores internos de registros.
+`heading-store.js` administra el historial compartido. Se persiste como datos JSON en `data/used-headings.json`, sin ejecutar contenido introducido por usuarios. El botón «Buscar en el historial» consulta exclusivamente este JSON; no llama a IA, Python ni catálogos externos. Se retiraron la descarga JS y su endpoint.
 
-La búsqueda normaliza mayúsculas, acentos, espacios y puntuación final para recuperar formas usadas, conservando su escritura original. Las subdivisiones y sus códigos forman parte de la identidad del encabezamiento. Si no hay coincidencia completa se muestran variantes del mismo encabezamiento principal. El historial local no equivale a una autoridad validada por una institución externa.
+La búsqueda normaliza mayúsculas, acentos, espacios y puntuación final para recuperar formas usadas, conservando su escritura original. Las subdivisiones y sus códigos forman parte de la identidad del encabezamiento. Se muestran coincidencias exactas, variantes del mismo encabezamiento principal y términos similares por comparación de pares de caracteres (umbral 72%). El porcentaje es similitud textual, no validación bibliográfica. El índice normalizado se mantiene en memoria y se reconstruye cuando cambia el JSON, incluidos los cambios hechos fuera de la app; cada búsqueda necesita una sola petición. Las peticiones idénticas simultáneas se comparten. El historial local no equivale a una autoridad validada por una institución externa.
 
-Configura `HEADING_STORE_PATH` en un **disco persistente**, por ejemplo `/var/data/topic-authority/used-headings.json`, para conservarlo al desplegar de nuevo. El `render.yaml` existente usa un plan gratuito sin disco persistente: el almacenamiento local de ese despliegue no garantiza conservar el historial. Ejecuta una sola instancia Node con este almacenamiento; para varias instancias hace falta una base de datos compartida. Respalda el JSON para conservar también la contabilidad por registro; la descarga JS contiene únicamente las entradas públicas.
+Configura `HEADING_STORE_PATH` en un **disco persistente**, por ejemplo `/var/data/topic-authority/used-headings.json`, para conservarlo al desplegar de nuevo. El `render.yaml` existente usa un plan gratuito sin disco persistente: el almacenamiento local de ese despliegue no garantiza conservar el historial. Ejecuta una sola instancia Node con este almacenamiento; para varias instancias hace falta una base de datos compartida. Respalda el JSON para conservar también la contabilidad por registro.
 
 Las búsquedas manuales abren el término codificado en [UNESCO](https://vocabularies.unesco.org/unesco/es/search), [Wikidata](https://www.wikidata.org/wiki/Special:Search) y [LCSH](https://id.loc.gov/search/). La consulta dentro de la app reutiliza los conectores HTTP existentes; no se agregó un cliente Z39.50.
 
@@ -58,7 +58,9 @@ Cada archivo expone una funcion `search_<fuente>(term)`. El manager unifica resu
 python3 -m authority_search.authority_manager "Botanica mexicana del siglo XVIII"
 ```
 
-## Fuentes configuradas
+## Fuentes de la consulta externa opcional
+
+Estas fuentes pertenecen al botón «Consulta externa (puede tardar)». Los enlaces de búsqueda manual visibles son únicamente UNESCO, Wikidata y LCSH. Ninguna de estas fuentes se consulta al buscar en el historial JSON.
 
 - VIAF: autosugerencia de autoridades `https://www.viaf.org/viaf/AutoSuggest`
 - Wikidata: API `wbsearchentities`
@@ -79,6 +81,7 @@ POST /api/topics
 Content-Type: application/json
 
 {
+  "mode": "pdf",
   "text": "Contenido del documento..."
 }
 ```
@@ -93,7 +96,9 @@ Respuesta:
 }
 ```
 
-El ejemplo de respuesta está abreviado: una respuesta satisfactoria tiene exactamente cinco propuestas y como máximo dos subdivisiones por propuesta. Envía `existingMain` junto a `text` para conservar el 650$a existente. Si el modelo incumple la estructura, la app muestra un error para reintentar; no inventa propuestas para completar el cupo.
+El ejemplo PDF está abreviado: `mode: "pdf"` devuelve cinco propuestas y omite `existingMain`, aunque se envíe. `mode: "marc"` devuelve un único encabezamiento con hasta dos subdivisiones en total; envía `existingMain` para conservar el 650$a. Si está vacío, se sugiere un encabezamiento nuevo. Las cinco propuestas son exclusivas del PDF. Por compatibilidad, omitir `mode` elige MARC si existe `existingMain`, o PDF en caso contrario. Si el modelo incumple la estructura, la app muestra un error para reintentar; no inventa propuestas para completar el cupo.
+
+Las generaciones idénticas se reutilizan durante cinco minutos (hasta 30 entradas en memoria), incluyendo solicitudes simultáneas. MARC solicita una respuesta más pequeña que PDF. La primera generación sigue dependiendo del tiempo de respuesta del proveedor; estas optimizaciones no eliminan latencia de red ni arranque del alojamiento.
 
 Historial: `GET /api/headings?q=Educación` devuelve `{ "headings": [...] }`. Tras verificar el registro guardado, el integrador envía `POST /api/heading-usage` con `{ "confirmed": true, "recordId": "https://koha.example:123", "headings": [...] }`. Es una instantánea de los encabezamientos locales presentes en ese registro; los reintentos son idempotentes. Este endpoint confía en el integrador del staff, no autentica por sí solo una sesión Koha: restringe el acceso de red al servicio y configura `ALLOWED_ORIGINS` para los orígenes del staff (CORS no sustituye autenticación).
 

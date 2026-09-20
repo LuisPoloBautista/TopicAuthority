@@ -26,7 +26,8 @@ function ui() {
     window, headingLabel, setTimeout,
     fetch: async (url, options) => {
       requests.push({ url, options });
-      const headings = Array.from({ length: 5 }, () => ({ main: 'Educación', subdivisions: [{ code: 'z', value: 'México' }], label: 'Educación -- México' }));
+      const mode = options?.body ? JSON.parse(options.body).mode : '';
+      const headings = Array.from({ length: mode === 'marc' ? 1 : 5 }, () => ({ main: 'Educación', subdivisions: [{ code: 'z', value: 'México' }], label: 'Educación -- México' }));
       return { ok: true, json: async () => ({ headings, topics: headings.map(h => h.label) }) };
     }
   });
@@ -41,9 +42,13 @@ test('UI offers subdivision generation for an existing 650$a and heading generat
   assert.equal(requests.length, 0);
   await nodes.get('analyzeKohaBtn').events.click();
   assert.equal(JSON.parse(requests[0].options.body).existingMain, 'Educación');
-  assert.equal((nodes.get('output').innerHTML.match(/class="topic-card"/g) || []).length, 5);
+  assert.equal((nodes.get('marcOutput').innerHTML.match(/class="topic-card"/g) || []).length, 1);
+  assert.equal(nodes.get('output').innerHTML, '');
+  await context.analyzeText('Texto PDF', '', 'pdf', nodes.get('pdfOutput'));
+  assert.equal((nodes.get('pdfOutput').innerHTML.match(/class="topic-card"/g) || []).length, 5);
+  assert.equal((nodes.get('marcOutput').innerHTML.match(/class="topic-card"/g) || []).length, 1);
   context.receiveKohaContext({ existingMain: '', existingTerm: '', marcText: '=245 $a Historia' }, 'https://koha.test');
-  assert.match(nodes.get('analyzeKohaBtn').textContent, /5 encabezamientos/);
+  assert.match(nodes.get('analyzeKohaBtn').textContent, /un encabezamiento/);
   assert.equal(nodes.get('authorityTermInput').value, '');
 });
 

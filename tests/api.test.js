@@ -12,12 +12,14 @@ test('API generates typed headings and counts confirmed records only', async t =
   const dir = await mkdtemp(path.join(os.tmpdir(), 'topic-api-'));
   const h = { main: 'Educación', subdivisions: [{ code: 'z', value: 'México' }] };
   let prompt = '';
+  let generations = 0;
   const mock = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
     prompt = JSON.parse(body).input[0].content[0].text;
+    generations++;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ output_text: JSON.stringify(Array.from({ length: 5 }, () => h)) }));
+    res.end(JSON.stringify({ output_text: JSON.stringify(Array.from({ length: prompt.includes('UN solo') ? 1 : 5 }, () => h)) }));
   }).listen(0, '127.0.0.1');
   await once(mock, 'listening');
   const server = spawn(process.execPath, ['server.js'], {
@@ -41,17 +43,21 @@ test('API generates typed headings and counts confirmed records only', async t =
     });
   });
   const post = (endpoint, data) => fetch(url + endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-  const generated = await post('/api/topics', { text: '=245 $a Educación en México', existingMain: 'Educación' });
+  const marcRequest = { text: '=245 $a Educación en México', existingMain: 'Educación', mode: 'marc' };
+  const generated = await post('/api/topics', marcRequest);
   assert.equal(generated.status, 200);
-  assert.equal((await generated.json()).headings.length, 5);
+  assert.equal((await generated.json()).headings.length, 1);
   assert.match(prompt, /Conserva literalmente/);
+  await post('/api/topics', marcRequest);
+  assert.equal(generations, 1);
+  const pdf = await post('/api/topics', { ...marcRequest, mode: 'pdf' });
+  assert.equal((await pdf.json()).headings.length, 5);
+  assert.doesNotMatch(prompt, /Conserva literalmente/);
   assert.deepEqual((await (await fetch(url + '/api/headings?q=educacion')).json()).headings, []);
   assert.equal((await post('/api/heading-usage', { recordId: 'koha:1', headings: [h] })).status, 400);
   for (let i = 0; i < 2; i++) assert.equal((await post('/api/heading-usage', { confirmed: true, recordId: 'koha:1', headings: [h] })).status, 200);
   assert.equal((await (await fetch(url + '/api/headings?q=educacion')).json()).headings[0].uses, 1);
-  const js = await (await fetch(url + '/api/used-headings.js')).text();
-  assert.match(js, /^export default /);
-  assert.ok(!js.includes('koha:1'));
+  assert.equal((await fetch(url + '/api/used-headings.js')).status, 404);
   assert.equal((await fetch(url + '/data/used-headings.json')).status, 404);
   assert.equal((await fetch(url + '/server.js')).status, 404);
 });

@@ -19,55 +19,55 @@
     <main class="container">
       <header class="hero">
         <h1>Autoridades de materia MARC21</h1>
-        <p>Busca, valida y transfiere términos controlados para la etiqueta 650 de Koha.</p>
+        <p>Reutiliza encabezamientos del historial y prepara la etiqueta 650 de Koha.</p>
       </header>
 
-      <p class="intro">Escribe un encabezamiento de materia o utiliza el contexto bibliográfico de Koha. Busca encabezamientos usados anteriormente para normalizar su uso. Puedes revisar otros catálogos manualmente o consultarlos desde la app.</p>
-      
-      <div class="lemb-info">
-        <strong>Verificación de autoridades:</strong> las sugerencias generadas por IA son candidatos, no autoridades confirmadas. Utiliza preferentemente resultados exactos o términos preferidos de LCSH, BNE, UNESCO y EuroVoc.
-      </div>
+      <p class="intro">Busca encabezamientos iguales o similares en tu historial. Usa el espacio MARC para un encabezamiento con hasta dos subdivisiones, o el espacio PDF para cinco propuestas temáticas.</p>
+      <div class="lemb-info"><strong>Revisión bibliográfica:</strong> una propuesta de IA o un encabezamiento del historial no es una autoridad validada. Los enlaces a UNESCO, Wikidata y LCSH permiten revisar manualmente el término en otra pestaña.</div>
 
       <div class="block authority-query" id="authorityQueryBlock">
-        <h2>1) Buscar un encabezamiento de materia</h2>
+        <h2>Historial de encabezamientos usados</h2>
         <label for="authorityTermInput">Tema o encabezamiento 650</label>
         <input id="authorityTermInput" type="text" placeholder="Ejemplo: Inteligencia artificial -- Aspectos éticos" autocomplete="off" />
         <div class="koha-actions">
           <button id="searchAuthorityBtn" type="button">Buscar en el historial local</button>
-          <button id="analyzeKohaBtn" type="button" hidden>Obtener sugerencias desde los campos MARC</button>
         </div>
         <div id="catalogLinks" class="catalog-links"></div>
-        <p id="kohaContextMessage" class="query-help">Escribe un término para localizar formas autorizadas y equivalencias multilingües.</p>
+        <p class="query-help">Busca coincidencias exactas o similares en el historial JSON de esta app, sin consultar IA ni catálogos externos.</p>
+        <div id="output" aria-live="polite">Escribe un encabezamiento para comprobar si ya se ha usado.</div>
       </div>
 
+      <section class="block generation-panel" aria-labelledby="marcTitle">
+        <h2 id="marcTitle">Subdivisiones desde los campos MARC</h2>
+        <p id="kohaContextMessage" class="query-help">Abre la herramienta desde Koha para usar el contexto MARC. Si 650$a ya tiene texto, se conserva y se sugieren hasta dos subdivisiones en total. Si está vacío, se propone un solo encabezamiento.</p>
+        <button id="analyzeKohaBtn" type="button" hidden>Sugerir hasta 2 subdivisiones</button>
+        <div id="marcOutput" class="generation-output" aria-live="polite">Aquí aparecerá un solo encabezamiento con sus subdivisiones.</div>
+      </section>
+
       <div class="block">
-        <h2>2) Generar sugerencias desde un PDF</h2>
+        <h2>Propuestas temáticas desde un PDF</h2>
+        <p>Genera cinco encabezamientos diferentes a partir del documento, con hasta dos subdivisiones por tema. Esta generación es independiente del 650$a seleccionado en Koha.</p>
         <div id="dropZone" class="drop-zone">
           <p>Arrastra y suelta un PDF aquí o haz clic para seleccionar</p>
           <input type="file" id="pdfInput" accept="application/pdf" style="display: none;" />
         </div>
         <br/>
-        <button id="processPdfBtn">Generar 5 sugerencias desde el PDF</button>
+        <button id="processPdfBtn">Generar 5 temas desde el PDF</button>
+        <div id="pdfOutput" class="generation-output" aria-live="polite">Aquí aparecerán las cinco propuestas del PDF.</div>
       </div>
 
-      <div class="block">
-        <h2>Encabezamientos y coincidencias</h2>
-        <p><a href="/api/used-headings.js" download="used-headings.js">Descargar historial de uso (.js)</a></p>
-        <div id="output">Escribe un término, utiliza el contexto de Koha o analiza un documento.</div>
-      </div>
     </main>
 
     <aside class="info-sidebar" id="infoSidebar">
       <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Contraer información">i</button>
       <div class="sidebar-content">
-        <h2>Cómo interpretar los resultados</h2>
-        <p>La herramienta ordena las fuentes bibliotecarias y muestra el grado de correspondencia encontrado.</p>
+        <h2>Cómo usar la herramienta</h2>
         <ul>
-          <li><strong>Exacta o término preferido:</strong> mejor candidato para revisión y uso.</li>
-          <li><strong>Parcial, variante o aproximada:</strong> comprueba el alcance antes de incorporarlo.</li>
-          <li>BNE se consulta sobre el índice oficial publicado por <a href="https://bnelab.bne.es/dato/catalogo-de-autoridades/" target="_blank" rel="noopener noreferrer">BNElab</a>.</li>
-          <li>EuroVoc y UNESCO aportan términos controlados multilingües; Wikidata ayuda a construir variantes de búsqueda.</li>
-          <li>“Usar autoridad” transfiere el término, URI, indicadores y código de fuente a la etiqueta 650; Koha no guarda automáticamente.</li>
+          <li><strong>Historial:</strong> muestra encabezamientos usados, coincidencias similares y número de registros. Importa la forma existente para normalizar su uso.</li>
+          <li><strong>MARC:</strong> un solo encabezamiento con hasta dos subdivisiones: materia ($x), cronología ($y), geografía ($z) o forma ($v).</li>
+          <li><strong>PDF:</strong> cinco propuestas temáticas en un espacio independiente.</li>
+          <li><strong>Catálogos:</strong> UNESCO, Wikidata y LCSH se abren con el término escrito. La consulta externa dentro de la app es opcional y puede tardar; no forma parte de la búsqueda en el historial.</li>
+          <li><strong>Uso:</strong> transferir un encabezamiento no guarda el registro. El contador se actualiza al verificar el guardado en Koha.</li>
         </ul>
       </div>
     </aside>

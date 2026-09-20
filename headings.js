@@ -29,9 +29,10 @@ export function headingKey(heading) {
   return JSON.stringify([normalizeTerm(heading.main), ...heading.subdivisions.map(part => [part.code, normalizeTerm(part.value)])]);
 }
 
-export function parseGeneratedHeadings(raw, existingMain = '') {
+export function parseGeneratedHeadings(raw, existingMain = '', mode = 'pdf') {
   const parsed = JSON.parse(String(raw).trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, ''));
-  if (!Array.isArray(parsed) || parsed.length !== 5) throw new Error('La IA debe devolver exactamente cinco propuestas. Vuelve a intentarlo.');
+  const count = mode === 'pdf' ? 5 : 1;
+  if (!Array.isArray(parsed) || parsed.length !== count) throw new Error(`La IA debe devolver ${count} encabezamiento(s). Vuelve a intentarlo.`);
   const headings = parsed.map(validateHeading);
   if (existingMain && headings.some(h => normalizeTerm(h.main) !== normalizeTerm(existingMain))) {
     throw new Error('La IA cambió el encabezamiento 650$a existente. Vuelve a intentarlo.');

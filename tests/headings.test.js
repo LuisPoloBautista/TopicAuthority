@@ -16,6 +16,8 @@ test('five proposals, typed subdivisions and preservation of existing 650$a', ()
   assert.equal(result[0].subdivisions[0].code, 'z');
   assert.throws(() => parseGeneratedHeadings(raw, 'Historia'));
   assert.throws(() => parseGeneratedHeadings(JSON.stringify([heading])));
+  assert.equal(parseGeneratedHeadings(JSON.stringify([heading]), 'Educación', 'marc').length, 1);
+  assert.throws(() => parseGeneratedHeadings(raw, 'Educación', 'marc'));
   assert.throws(() => validateHeading({ ...heading, subdivisions: [...heading.subdivisions, { code: 'x', value: 'Historia' }] }));
   assert.throws(() => validateHeading({ ...heading, subdivisions: [{ code: 'a', value: 'Incorrecto' }] }));
 });
@@ -36,6 +38,9 @@ test('persistent history: concurrent saves, deduplication, removal and normaliza
   assert.equal(matches.length, 1);
   assert.equal(matches[0].uses, 2);
   assert.equal(matches[0].main, 'Educación');
+  assert.equal((await reopened.search('Educacion -- Argentina'))[0].main, 'Educación');
+  assert.equal((await reopened.search('Educasion'))[0].main, 'Educación');
+  assert.equal((await reopened.search('Química cuántica')).length, 0);
   assert.equal((await reopened.search('educacion--mexico--bibliografias'))[0].exact, true);
   await reopened.saveRecord('koha:1', []);
   assert.equal((await reopened.search('Educación'))[0].uses, 1);
@@ -53,4 +58,19 @@ test('invalid history is not silently overwritten and a failed write does not bl
   await writeFile(filename, JSON.stringify({ entries: [], records: {} }));
   await store.saveRecord('koha:1', [heading]);
   assert.equal((await store.search('Educación'))[0].uses, 1);
+});
+
+test('the search index reuses the JSON snapshot and refreshes after external edits', async t => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'topic-index-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const filename = path.join(dir, 'headings.json');
+  const store = new HeadingStore(filename);
+  await store.saveRecord('koha:1', [heading]);
+  const first = await store.read();
+  assert.equal(await store.read(), first);
+  await writeFile(filename, JSON.stringify({ entries: [{ main: 'Física', label: 'Física', subdivisions: [], uses: 3 }], records: {} }));
+  assert.equal((await store.search('Física'))[0].uses, 3);
+  assert.equal((await store.search('Educación')).length, 0);
+  await rm(filename);
+  assert.equal((await store.search('Física')).length, 0);
 });
