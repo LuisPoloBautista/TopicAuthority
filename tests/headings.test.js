@@ -74,3 +74,41 @@ test('the search index reuses the JSON snapshot and refreshes after external edi
   await rm(filename);
   assert.equal((await store.search('Física')).length, 0);
 });
+
+test('related words ignore parenthetical qualifiers without merging distinct headings; record references survive restart', async t => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'topic-related-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const filename = path.join(dir, 'headings.json');
+  const store = new HeadingStore(filename);
+  const h = { main: 'Modelos grandes de lenguaje', subdivisions: [] };
+  await store.saveRecord('https://koha.example:8443:42', [h]);
+  await store.saveRecord('https://koha.example:8443:55', [h]);
+  const reopened = new HeadingStore(filename);
+  const results = await reopened.search('Modelos de lenguaje (Ciencia de la computación)');
+  assert.equal(results[0].main, h.main);
+  assert.equal(results[0].exact, false);
+  assert.equal(results[0].uses, 2);
+  assert.deepEqual(results[0].records, [
+    { origin: 'https://koha.example:8443', biblionumber: '42' },
+    { origin: 'https://koha.example:8443', biblionumber: '55' }
+  ]);
+  assert.equal((await reopened.search('Modelos de negocios')).length, 0);
+  await reopened.saveRecord('https://koha.example:8443:42', []);
+  assert.equal((await reopened.search(h.main))[0].records.length, 1);
+});
+
+test('legacy usage counts remain intact and resaving backfills biblionumber', async t => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'topic-legacy-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const filename = path.join(dir, 'headings.json');
+  const store = new HeadingStore(filename);
+  await store.saveRecord('https://koha.test:7', [heading]);
+  const data = structuredClone(await store.read());
+  delete data.recordInfo;
+  await writeFile(filename, JSON.stringify(data));
+  assert.deepEqual((await store.search('Educación'))[0].records, []);
+  await store.saveRecord('https://koha.test:7', [heading]);
+  const result = (await store.search('Educación'))[0];
+  assert.equal(result.uses, 1);
+  assert.equal(result.records[0].biblionumber, '7');
+});

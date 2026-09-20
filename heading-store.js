@@ -12,7 +12,16 @@ export class HeadingStore {
       const version = `${info.mtimeMs}:${info.ctimeMs}:${info.size}`;
       if (this.snapshot && this.version === version) return this.snapshot;
       const data = JSON.parse(await readFile(this.filename, 'utf8'));
-      this.index = data.entries.map(h => ({ heading: h, label: normalizeTerm(h.label), main: normalizeTerm(h.main) }));
+      const recordsByHeading = new Map();
+      for (const [recordKey, ids] of Object.entries(data.records || {})) {
+        const ref = data.recordInfo?.[recordKey];
+        if (!ref) continue;
+        for (const id of ids) {
+          if (!recordsByHeading.has(id)) recordsByHeading.set(id, []);
+          recordsByHeading.get(id).push(ref);
+        }
+      }
+      this.index = data.entries.map(h => ({ heading: { ...h, records: recordsByHeading.get(h.id) || [] }, label: normalizeTerm(h.label), main: normalizeTerm(h.main), words: coreWords(h.main) }));
       this.version = version;
       this.snapshot = data;
       return data;
@@ -25,10 +34,11 @@ export class HeadingStore {
     if (!query) return [];
     await this.read();
     const main = query.split(' -- ')[0];
+    const words = coreWords(main);
     return this.index.map(item => {
       const exact = item.label === query;
       const score = exact ? 1 : item.main === main ? 0.98
-        : item.label.includes(query) || query.includes(item.label) ? 0.9 : similarity(main, item.main);
+        : item.label.includes(query) || query.includes(item.label) ? 0.9 : Math.max(similarity(main, item.main), wordSimilarity(words, item.words));
       return { ...item.heading, exact, similarity: Math.round(score * 100), score };
     }).filter(h => h.score >= 0.72)
       .sort((a, b) => b.score - a.score || b.uses - a.uses).slice(0, 50)
@@ -55,6 +65,15 @@ export class HeadingStore {
       // Snapshot by catalogue + biblionumber: retries and repeated saves do not inflate usage.
       const recordKey = createHash('sha256').update(recordId).digest('hex');
       data.records[recordKey] = [...new Set(ids)];
+      // Keep a readable reference for new saves; legacy hashes cannot be reversed.
+      const match = recordId.match(/^(https?:\/\/.+):(\d+)$/);
+      if (match) {
+        const origin = new URL(match[1]);
+        if (origin.origin === match[1]) {
+          data.recordInfo ||= {};
+          data.recordInfo[recordKey] = { origin: origin.origin, biblionumber: match[2] };
+        }
+      }
       const counts = new Map();
       for (const list of Object.values(data.records)) for (const id of list) counts.set(id, (counts.get(id) || 0) + 1);
       for (const entry of data.entries) entry.uses = counts.get(entry.id) || 0;
@@ -67,6 +86,18 @@ export class HeadingStore {
     this.queue = action.catch(() => {});
     return action;
   }
+}
+
+const stopWords = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'y', 'o', 'para', 'por', 'con', 'un', 'una']);
+function coreWords(value) {
+  return new Set(normalizeTerm(value).replace(/\([^)]*\)/g, ' ').split(/[^\p{L}\p{N}]+/u).filter(word => word && !stopWords.has(word)));
+}
+function wordSimilarity(a, b) {
+  const shared = [...a].filter(word => b.has(word)).length;
+  // Two meaningful shared words are required; a shared generic noun is not enough.
+  if (shared < 2) return 0;
+  const coverage = shared / Math.min(a.size, b.size);
+  return Math.min(0.92, 0.6 * coverage + 0.4 * shared / Math.max(a.size, b.size));
 }
 
 // Character bigrams tolerate small spelling differences without external services.

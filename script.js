@@ -151,20 +151,55 @@ async function showLocalMatches(card, heading, automatic = false) {
       ? `${automatic ? 'Advertencia: ' : ''}Ya hay ${related.length} encabezamiento(s) coincidente(s) en el historial. Revisa e importa la forma usada para normalizarla.`
       : 'No hay coincidencias en el historial. Puedes usarlo como nuevo.';
     container.append(message);
-    for (const match of related) {
-      const row = document.createElement('div');
-      row.className = 'history-match';
-      const label = document.createElement('span');
-      label.textContent = `${match.label} — ${match.uses} registro(s) · ${match.exact ? 'Coincidencia exacta' : 'Similar (' + match.similarity + '%)'}`;
-      row.append(label);
-      if (kohaParentOrigin) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = 'Importar encabezamiento usado';
-        button.addEventListener('click', () => sendHeading(match));
-        row.append(button);
+    if (related.length) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'history-table-wrapper';
+      const table = document.createElement('table');
+      table.className = 'history-table';
+      const caption = document.createElement('caption');
+      caption.textContent = 'Encabezamientos recuperados del historial';
+      const thead = document.createElement('thead');
+      const header = document.createElement('tr');
+      for (const title of ['Encabezamiento usado', 'Coincidencia', 'Registros', 'Biblionumber', 'Acción']) {
+        const cell = document.createElement('th');
+        cell.scope = 'col'; cell.textContent = title; header.append(cell);
       }
-      container.append(row);
+      thead.append(header);
+      const tbody = document.createElement('tbody');
+      for (const match of related) {
+        const row = document.createElement('tr');
+        const cell = text => { const td = document.createElement('td'); td.textContent = text; row.append(td); return td; };
+        cell(match.label);
+        cell(match.exact ? 'Exacta' : `Similar (${match.similarity}%)`);
+        cell(String(match.uses || 0));
+        const records = cell('');
+        for (const ref of match.records || []) {
+          try {
+            const origin = new URL(ref.origin);
+            if (!['https:', 'http:'].includes(origin.protocol) || origin.origin !== ref.origin || !/^\d+$/.test(ref.biblionumber)) continue;
+            const link = document.createElement('a');
+            link.href = origin.origin + '/cgi-bin/koha/catalogue/detail.pl?biblionumber=' + encodeURIComponent(ref.biblionumber);
+            link.textContent = ref.biblionumber;
+            link.title = origin.origin;
+            link.target = '_blank'; link.rel = 'noopener noreferrer';
+            records.append(link);
+          } catch { /* Invalid record references are not rendered as links. */ }
+        }
+        if (!records.children.length) records.textContent = match.uses ? 'No disponible para usos anteriores' : 'Sin registros actuales';
+        else if ((match.records || []).length < match.uses) {
+          const note = document.createElement('span'); note.textContent = 'Hay usos anteriores sin identificador.'; records.append(note);
+        }
+        const action = cell('');
+        if (kohaParentOrigin) {
+          const button = document.createElement('button');
+          button.type = 'button'; button.textContent = 'Importar encabezamiento';
+          button.addEventListener('click', () => sendHeading(match));
+          action.append(button);
+        } else action.textContent = 'Abre desde Koha para importar';
+        tbody.append(row);
+      }
+      table.append(caption, thead, tbody);
+      wrapper.append(table); container.append(wrapper);
     }
     card.dataset.historyChecked = 'true';
     return related;
@@ -184,7 +219,6 @@ function renderTopics(headings, generated = false, output = document.getElementB
         <button type="button" class="search-local">Buscar en el historial</button>
         ${(generated || heading.canUse) && kohaParentOrigin ? '<button type="button" class="use-new">Usar como nuevo</button>' : ''}
       </div>
-      <div class="catalog-links">${catalogLinks(heading.label)}</div>
       <div class="local-results" aria-live="polite"></div>
     </article>`).join('') + '</div>';
   [...output.querySelectorAll('.topic-card')].forEach((card, index) => {

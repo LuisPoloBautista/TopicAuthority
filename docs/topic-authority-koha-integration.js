@@ -6,10 +6,13 @@
   "use strict";
 
   const AUTHORITY_ORIGIN = "https://topicauthority.onrender.com";
-  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20260919b";
+  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20260920";
   const CATALOGUING_PATH = "/cgi-bin/koha/cataloguing/addbiblio.pl";
   let authorityFrame = null;
-  let target650Id = null;
+  let target650Node = null;
+  const targetTokens = new WeakMap();
+  let nextTargetToken = 0;
+  function currentTarget() { return target650Node?.isConnected ? target650Node : null; }
   const staged = new Map();
   const PENDING_KEY = 'topic-authority-pending-save-v2';
   const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/[.,;:]$/, '');
@@ -28,9 +31,8 @@
 
   function stageSave() {
     const headings = [];
-    staged.forEach((heading, id) => {
-      const node = document.getElementById(id);
-      if (node && key(headingFromNode(node)) === key(heading)) headings.push(heading);
+    staged.forEach((heading, node) => {
+      if (node.isConnected && key(headingFromNode(node)) === key(heading)) headings.push(heading);
     });
     sessionStorage.setItem(PENDING_KEY, JSON.stringify({
       recordId: document.querySelector('[name="biblionumber"]')?.value || new URLSearchParams(location.search).get('biblionumber') || '',
@@ -46,7 +48,7 @@
     if (pending.recordId !== recordId || Date.now() - pending.at > 30 * 60 * 1000) return;
     document.querySelectorAll('.tag[id^="tag_650_"]').forEach(node => {
       const match = pending.headings.find(h => key(h) === key(headingFromNode(node)));
-      if (match) staged.set(node.id, match);
+      if (match) staged.set(node, match);
     });
   }
 
@@ -171,7 +173,7 @@
 
   function sendContext() {
     if (!authorityFrame || !authorityFrame.contentWindow) return;
-    const node = document.getElementById(target650Id);
+    const node = currentTarget();
     authorityFrame.contentWindow.postMessage({
       type: "TOPIC_AUTHORITY_KOHA_CONTEXT",
       version: 1,
@@ -180,14 +182,15 @@
         existingTerm: current650(node),
         existingMain: fieldValue(node, "650", "a"),
         existingHeading: node ? headingFromNode(node) : null,
-        targetId: target650Id,
+        targetId: node ? targetTokens.get(node) : null,
         marcText: marcContext()
       }
     }, AUTHORITY_ORIGIN);
   }
 
   function openAuthority(node) {
-    target650Id = node.id;
+    target650Node = node;
+    if (!targetTokens.has(node)) targetTokens.set(node, 'topic-650-' + (++nextTargetToken));
     document.getElementById("topic-authority-modal").style.display = "flex";
     document.body.style.overflow = "hidden";
     sendContext();
@@ -201,6 +204,15 @@
     document.body.style.overflow = "";
   }
 
+  function onLauncherClick(event) {
+    const button = event.target.closest?.('.topic-authority-launcher');
+    if (!button) return;
+    const node = button.closest('.tag');
+    if (!node || tagNumber(node) !== '650') return;
+    event.preventDefault();
+    openAuthority(node);
+  }
+
   function addButtons() {
     document.querySelectorAll('.tag[id^="tag_650_"]').forEach(function (node) {
       if (node.querySelector(".topic-authority-launcher")) return;
@@ -208,14 +220,13 @@
       button.type = "button";
       button.className = "btn btn-sm btn-primary topic-authority-launcher";
       button.innerHTML = '<i class="fa fa-lightbulb" aria-hidden="true"></i> Sugerencia de autoridad';
-      button.addEventListener("click", function () { openAuthority(node); });
       const controls = node.querySelector(".field_controls");
       (controls || node.querySelector(".tag_title") || node).appendChild(button);
     });
   }
 
   function useAuthority(authority) {
-    const node = document.getElementById(target650Id);
+    const node = currentTarget();
     if (!node) throw new Error("Ya no se encuentra la etiqueta 650 seleccionada");
     const subfields = authority.subfields || [{ code: 'a', value: authority.label }];
     const desired = [...subfields, { code: '0', value: authority.uri || '' }, { code: '2', value: authority.sourceCode || '' }];
@@ -247,8 +258,8 @@
     const indicators = node.querySelectorAll('input.indicator');
     if (indicators[0]) indicators[0].value = authority.ind1 || ' ';
     if (indicators[1]) indicators[1].value = authority.ind2 || '4';
-    if (authority.localHeading) staged.set(target650Id, authority.localHeading);
-    else staged.delete(target650Id);
+    if (authority.localHeading) staged.set(node, authority.localHeading);
+    else staged.delete(node);
     closeAuthority();
   }
 
@@ -295,6 +306,8 @@
     document.getElementById("topic-authority-close").addEventListener("click", closeAuthority);
     modal.addEventListener("click", function (event) { if (event.target === modal) closeAuthority(); });
 
+    // Delegation also handles buttons copied by Koha when a 650 is repeated.
+    document.addEventListener('click', onLauncherClick);
     addButtons();
     new MutationObserver(addButtons).observe(document.getElementById("f") || document.body, { childList: true, subtree: true });
     window.addEventListener("message", function (event) {

@@ -5,8 +5,9 @@ import vm from 'node:vm';
 import { headingLabel } from '../headings.js';
 
 const code = (await readFile(new URL('../script.js', import.meta.url), 'utf8')).replace(/^import .*\r?\n/, '');
-function element() {
+function element(tagName) {
   return {
+    tagName,
     value: '', textContent: '', innerHTML: '', children: [], events: {}, dataset: {},
     classList: { contains: () => false },
     setAttribute() {},
@@ -23,11 +24,11 @@ function ui() {
   const window = { parent: { postMessage: message => messages.push(message) }, addEventListener() {} };
   const context = vm.createContext({
     document: { getElementById: id => { if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); }, createElement: element },
-    window, headingLabel, setTimeout,
+    window, headingLabel, setTimeout, URL,
     fetch: async (url, options) => {
       requests.push({ url, options });
       const mode = options?.body ? JSON.parse(options.body).mode : '';
-      const headings = Array.from({ length: mode === 'marc' ? 1 : 5 }, () => ({ main: 'Educación', subdivisions: [{ code: 'z', value: 'México' }], label: 'Educación -- México' }));
+      const headings = Array.from({ length: mode === 'marc' ? 1 : 5 }, () => ({ main: 'Educación', subdivisions: [{ code: 'z', value: 'México' }], label: 'Educación -- México', uses: 1, records: [{ origin: 'https://koha.test', biblionumber: '42' }] }));
       return { ok: true, json: async () => ({ headings, topics: headings.map(h => h.label) }) };
     }
   });
@@ -43,7 +44,7 @@ test('UI offers subdivision generation for an existing 650$a and heading generat
   await nodes.get('analyzeKohaBtn').events.click();
   assert.equal(JSON.parse(requests[0].options.body).existingMain, 'Educación');
   assert.equal((nodes.get('marcOutput').innerHTML.match(/class="topic-card"/g) || []).length, 1);
-  assert.doesNotMatch(nodes.get('marcOutput').innerHTML, /search-external|Consulta externa/);
+  assert.doesNotMatch(nodes.get('marcOutput').innerHTML, /search-external|Consulta externa|Buscar manualmente/);
   assert.equal(nodes.get('output').innerHTML, '');
   await context.analyzeText('Texto PDF', '', 'pdf', nodes.get('pdfOutput'));
   assert.equal((nodes.get('pdfOutput').innerHTML.match(/class="topic-card"/g) || []).length, 5);
@@ -60,7 +61,11 @@ test('automatic history warning imports typed MARC data without recording a use'
   const card = { dataset: {}, querySelector: () => results };
   await context.showLocalMatches(card, { main: 'Educación', label: 'Educación -- México' }, true);
   assert.match(results.children[0].textContent, /Advertencia/);
-  results.children[1].children[1].events.click();
+  const table = results.children[1].children[0];
+  assert.equal(table.tagName, 'table');
+  const row = table.children[2].children[0];
+  assert.equal(row.children[3].children[0].href, 'https://koha.test/cgi-bin/koha/catalogue/detail.pl?biblionumber=42');
+  row.children[4].children[0].events.click();
   const message = messages.find(m => m.type === 'TOPIC_AUTHORITY_USE');
   assert.deepEqual(JSON.parse(JSON.stringify(message.authority.subfields)), [{ code: 'a', value: 'Educación' }, { code: 'z', value: 'México' }]);
   assert.equal(message.authority.ind2, '4');

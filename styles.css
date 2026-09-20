@@ -474,6 +474,13 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .catalog-links a { color: var(--brand-dark); font-weight: 600; }
 .duplicate-warning { padding: 12px; background: #fef3c7; color: #78350f; border-radius: 8px; }
 .history-match { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.history-table-wrapper { overflow-x: auto; margin-top: 12px; }
+.history-table { border-collapse: collapse; width: 100%; text-align: left; }
+.history-table caption { text-align: left; font-weight: 600; padding: 8px 0; }
+.history-table th, .history-table td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.history-table th { background: var(--brand-soft); }
+.history-table td a, .history-table td span { display: block; }
+.history-table td a { color: var(--brand-dark); }
 .topic-card { overflow-wrap: anywhere; }
 .generation-panel { border-top: 2px solid var(--line); padding-top: 20px; }
 .generation-output { margin-top: 18px; padding: 16px; background: #fffdfb; border: 1px solid #ffd7c7; border-radius: 8px; }
