@@ -43,6 +43,7 @@ test('UI offers subdivision generation for an existing 650$a and heading generat
   await nodes.get('analyzeKohaBtn').events.click();
   assert.equal(JSON.parse(requests[0].options.body).existingMain, 'Educación');
   assert.equal((nodes.get('marcOutput').innerHTML.match(/class="topic-card"/g) || []).length, 1);
+  assert.doesNotMatch(nodes.get('marcOutput').innerHTML, /search-external|Consulta externa/);
   assert.equal(nodes.get('output').innerHTML, '');
   await context.analyzeText('Texto PDF', '', 'pdf', nodes.get('pdfOutput'));
   assert.equal((nodes.get('pdfOutput').innerHTML.match(/class="topic-card"/g) || []).length, 5);

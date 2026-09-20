@@ -2,13 +2,10 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readFileSync } from 'fs';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { createHash } from 'node:crypto';
 import { HeadingStore } from './heading-store.js';
 import { parseGeneratedHeadings } from './headings.js';
 
-const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const envPath = path.join(__dirname, '.env');
@@ -26,10 +23,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const OPENAI_RESPONSES_URL = process.env.OPENAI_RESPONSES_URL || 'https://api.openai.com/v1/responses';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.5';
-const localPython = path.join(__dirname, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
-const PYTHON_BIN = process.env.PYTHON_BIN || (existsSync(localPython) ? localPython : (process.platform === 'win32' ? 'python' : 'python3'));
-const AUTHORITY_CLI_TIMEOUT_MS = Number(process.env.AUTHORITY_CLI_TIMEOUT_MS || 45000);
-
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
   .split(',')
   .map(origin => origin.trim())
@@ -115,48 +108,6 @@ async function cachedGeneration(text, main, mode) {
   catch (error) { generationCache.delete(key); throw error; }
 }
 
-async function searchAuthorities(topic) {
-  const fallbackPayload = {
-    topic,
-    queries: [{ term: topic, role: 'encabezamiento principal', priority: 0 }],
-    sources: [
-      { source: 'Wikidata', status: 'error', count: 0 },
-      { source: 'BNE', status: 'error', count: 0 },
-      { source: 'DBpedia', status: 'error', count: 0 },
-      { source: 'LCSH', status: 'error', count: 0 },
-      { source: 'UNESCO', status: 'error', count: 0 },
-      { source: 'EuroVoc', status: 'error', count: 0 },
-      { source: 'VIAF', status: 'error', count: 0 },
-    ],
-    authorities: [],
-    partial: true,
-  };
-
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      PYTHON_BIN,
-      ['-m', 'authority_search.authority_manager', topic],
-      {
-        cwd: __dirname,
-        timeout: AUTHORITY_CLI_TIMEOUT_MS,
-        maxBuffer: 1024 * 1024,
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
-      },
-    );
-    if (stderr) console.warn(stderr.trim());
-    return JSON.parse(stdout);
-  } catch (error) {
-    if (error.stderr) console.warn(String(error.stderr).trim());
-    if (error.stdout) {
-      const jsonStart = String(error.stdout).indexOf('{');
-      if (jsonStart >= 0) {
-        return JSON.parse(String(error.stdout).slice(jsonStart));
-      }
-    }
-    return fallbackPayload;
-  }
-}
-
 app.get('/api/headings', async (req, res) => {
   try { res.json({ headings: await headingStore.search(String(req.query.q || '')) }); }
   catch { res.status(500).json({ error: 'No se pudo leer el historial de encabezamientos.' }); }
@@ -177,7 +128,7 @@ app.get('/api/health', (req, res) => {
     provider: 'openai',
     model: OPENAI_MODEL,
     hasApiKey: Boolean(process.env.OPENAI_API_KEY),
-    authoritySearch: true,
+    historySearch: true,
   });
 });
 
@@ -190,18 +141,6 @@ app.post('/api/topics', async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error('Error in /api/topics:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get(['/topics/:topic/authorities', '/api/topics/:topic/authorities'], async (req, res) => {
-  try {
-    const topic = req.params.topic;
-    if (!topic) return res.status(400).json({ error: 'Topic is required' });
-    const payload = await searchAuthorities(topic);
-    res.json(payload);
-  } catch (error) {
-    console.error('Error in authority search:', error);
     res.status(500).json({ error: error.message });
   }
 });

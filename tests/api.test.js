@@ -60,4 +60,5 @@ test('API generates typed headings and counts confirmed records only', async t =
   assert.equal((await fetch(url + '/api/used-headings.js')).status, 404);
   assert.equal((await fetch(url + '/data/used-headings.json')).status, 404);
   assert.equal((await fetch(url + '/server.js')).status, 404);
+  assert.equal((await fetch(url + '/api/topics/Educacion/authorities')).status, 404);
 });

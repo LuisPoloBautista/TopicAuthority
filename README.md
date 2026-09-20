@@ -9,7 +9,7 @@ Espacio MARC: 650$a con información -> conservarlo + hasta 2 subdivisiones en t
 Espacio MARC: 650$a vacío -> 1 encabezamiento + hasta 2 subdivisiones
 Espacio PDF: 5 temas independientes del 650$a, hasta 2 subdivisiones por tema
   -> comprobar historial local, advertir coincidencias e importar una forma usada
-  -> consultar manualmente UNESCO, Wikidata o LCSH, o buscar desde la app
+  -> consultar manualmente UNESCO, Wikidata o LCSH, sin consulta externa dentro de la app
   -> transferir a Koha -> guardar registro -> verificar MARCXML -> contabilizar uso
 ```
 
@@ -19,11 +19,11 @@ El integrador actualizado está incluido en este repositorio: [`docs/topic-autho
 
 El botón **Ampliar ventana / Restaurar tamaño** está en la cabecera del modal de Koha. La app recibe `existingMain`, `existingTerm`, `targetId` y `marcText` por `postMessage`. No genera ni consulta catálogos externos automáticamente: el usuario elige la acción. Sí comprueba el historial al mostrar propuestas de IA y nuevamente antes de transferirlas, incluso si no se pulsó «Buscar».
 
-Las propuestas nuevas usan indicador 2 = `4` (fuente no especificada), sin URI ni código de autoridad inventados. Las subdivisiones se transfieren a sus subcampos, conservando el orden y las repeticiones. Si falta un subcampo o una ocurrencia en el framework, la transferencia se detiene antes de modificar el formulario y avisa cuál agregar. Los resultados externos conservan el tratamiento de fuente de la versión anterior; el catalogador debe revisar su alcance antes de importarlos.
+Las propuestas nuevas usan indicador 2 = `4` (fuente no especificada), sin URI ni código de autoridad inventados. Las subdivisiones se transfieren a sus subcampos, conservando el orden y las repeticiones. Si falta un subcampo o una ocurrencia en el framework, la transferencia se detiene antes de modificar el formulario y avisa cuál agregar.
 
-La selección no cuenta como uso. El integrador conserva provisionalmente la selección en la pestaña, detecta el envío del formulario y, al llegar a `detail.pl`, `MARCdetail.pl` o `additem.pl`, consulta el MARCXML guardado mediante `catalogue/export.pl`. Solo sincroniza encabezamientos presentes en ese MARC. Un guardado repetido del mismo registro no suma usos; retirar un encabezamiento y guardar actualiza su contador. El contador representa **registros distintos que usan el encabezamiento**, no clics ni consultas. Los registros ajenos a este flujo y las eliminaciones completas desde otras pantallas no se sincronizan automáticamente.
+La selección no cuenta como uso. El integrador conserva provisionalmente la selección en la pestaña, detecta el envío del formulario y, al llegar a `detail.pl`, `MARCdetail.pl` o `additem.pl`, consulta el MARCXML guardado mediante `catalogue/export.pl?format=marcxml&op=export&bib=ID`. El parámetro `op=export` es obligatorio. Si falla la exportación o devuelve HTML, intenta `GET /api/v1/biblios/ID` con `Accept: application/marcxml+xml` y la sesión del staff. Ambas vías son de solo lectura; ninguna confirma usos si no devuelve un MARCXML válido. Solo sincroniza encabezamientos presentes en ese MARC. Un guardado repetido del mismo registro no suma usos; retirar un encabezamiento y guardar actualiza su contador. El contador representa **registros distintos que usan el encabezamiento**, no clics ni consultas. Los registros ajenos a este flujo y las eliminaciones completas desde otras pantallas no se sincronizan automáticamente.
 
-Si falla la verificación o el servidor de historial, aparece un aviso con **Reintentar sincronización**. Los datos pendientes caducan a los 30 minutos y no se contabilizan al cancelar la edición. Koha necesita permitir la exportación MARCXML al usuario del staff. El flujo completo debe comprobarse en la instalación de Koha antes de ponerlo en producción.
+Si ambas vías de lectura fallan, se conservan los datos pendientes y aparece un aviso con el estado HTTP o error de cada vía, más **Reintentar sincronización**. También se informa si falla el servidor de historial. Este aviso se refiere a la sincronización del historial, no al resultado del guardado bibliográfico de Koha. Los datos pendientes caducan a los 30 minutos y no se contabilizan al cancelar la edición. Koha necesita permitir la exportación MARCXML al usuario del staff. El flujo completo debe comprobarse en la instalación de Koha antes de ponerlo en producción.
 
 ## Historial de encabezamientos
 
@@ -33,9 +33,9 @@ La búsqueda normaliza mayúsculas, acentos, espacios y puntuación final para r
 
 Configura `HEADING_STORE_PATH` en un **disco persistente**, por ejemplo `/var/data/topic-authority/used-headings.json`, para conservarlo al desplegar de nuevo. El `render.yaml` existente usa un plan gratuito sin disco persistente: el almacenamiento local de ese despliegue no garantiza conservar el historial. Ejecuta una sola instancia Node con este almacenamiento; para varias instancias hace falta una base de datos compartida. Respalda el JSON para conservar también la contabilidad por registro.
 
-Las búsquedas manuales abren el término codificado en [UNESCO](https://vocabularies.unesco.org/unesco/es/search), [Wikidata](https://www.wikidata.org/wiki/Special:Search) y [LCSH](https://id.loc.gov/search/). La consulta dentro de la app reutiliza los conectores HTTP existentes; no se agregó un cliente Z39.50.
+Las búsquedas manuales abren el término codificado en [UNESCO](https://vocabularies.unesco.org/unesco/es/search), [Wikidata](https://www.wikidata.org/wiki/Special:Search) y [LCSH](https://id.loc.gov/search/). Se retiraron el botón, el código de consulta externa de la interfaz y los endpoints `/topics/:topic/authorities` y `/api/topics/:topic/authorities`. La app conserva únicamente los enlaces de búsqueda manual; no se agregó un cliente Z39.50.
 
-No usa embeddings, bases vectoriales ni entrenamiento. BNE se compara localmente con RapidFuzz a partir de los archivos descargados del Catalogo de autoridades de BNE Lab: https://bnelab.bne.es/dato/catalogo-de-autoridades/. Las demas equivalencias se obtienen mediante consultas directas a fuentes externas.
+El módulo Python independiente (ya no conectado a la app) no usa embeddings, bases vectoriales ni entrenamiento. BNE se compara localmente con RapidFuzz a partir de los archivos descargados del Catalogo de autoridades de BNE Lab: https://bnelab.bne.es/dato/catalogo-de-autoridades/. Las demas equivalencias se obtienen mediante consultas directas a fuentes externas.
 
 ## Modulo de autoridades
 
@@ -58,9 +58,9 @@ Cada archivo expone una funcion `search_<fuente>(term)`. El manager unifica resu
 python3 -m authority_search.authority_manager "Botanica mexicana del siglo XVIII"
 ```
 
-## Fuentes de la consulta externa opcional
+## Fuentes del módulo Python independiente
 
-Estas fuentes pertenecen al botón «Consulta externa (puede tardar)». Los enlaces de búsqueda manual visibles son únicamente UNESCO, Wikidata y LCSH. Ninguna de estas fuentes se consulta al buscar en el historial JSON.
+Estas fuentes solo se utilizan al ejecutar el módulo Python por separado. La app no las consulta: muestra enlaces manuales a UNESCO, Wikidata y LCSH, y busca encabezamientos usados en su JSON local.
 
 - VIAF: autosugerencia de autoridades `https://www.viaf.org/viaf/AutoSuggest`
 - Wikidata: API `wbsearchentities`
@@ -102,34 +102,6 @@ Las generaciones idénticas se reutilizan durante cinco minutos (hasta 30 entrad
 
 Historial: `GET /api/headings?q=Educación` devuelve `{ "headings": [...] }`. Tras verificar el registro guardado, el integrador envía `POST /api/heading-usage` con `{ "confirmed": true, "recordId": "https://koha.example:123", "headings": [...] }`. Es una instantánea de los encabezamientos locales presentes en ese registro; los reintentos son idempotentes. Este endpoint confía en el integrador del staff, no autentica por sí solo una sesión Koha: restringe el acceso de red al servicio y configura `ALLOWED_ORIGINS` para los orígenes del staff (CORS no sustituye autenticación).
 
-Buscar autoridades:
-
-```http
-GET /topics/Botanica%20mexicana%20del%20siglo%20XVIII/authorities
-```
-
-Respuesta:
-
-```json
-{
-  "topic": "Botanica mexicana del siglo XVIII",
-  "authorities": [
-    {
-      "source": "Wikidata",
-      "label": "botanica",
-      "url": "https://www.wikidata.org/wiki/Q441",
-      "type": "Entidad relacionada"
-    }
-  ]
-}
-```
-
-Tambien existe el alias:
-
-```http
-GET /api/topics/{topic}/authorities
-```
-
 ## Variables de entorno
 
 | Variable | Valor por defecto | Descripcion |
@@ -138,7 +110,6 @@ GET /api/topics/{topic}/authorities
 | `OPENAI_MODEL` | `gpt-5.5` | Modelo usado para generar temas. |
 | `OPENAI_TIMEOUT_MS` | `120000` | Timeout de OpenAI. |
 | `PORT` | `3000` | Puerto del servidor. |
-| `PYTHON_BIN` | `.venv` local, si existe; de lo contrario `python` en Windows o `python3` | Ejecutable usado para llamar el modulo Python. |
 | `AUTHORITY_SOURCES` | `lcsh,bne,unesco,eurovoc,wikidata,viaf,dbpedia` | Fuentes habilitadas, priorizando LC y vocabularios multilingues en espanol. |
 | `AUTHORITY_TIMEOUT_SECONDS` | `5` | Timeout por consulta externa. |
 | `AUTHORITY_MAX_RESULTS` | `3` | Resultados maximos por fuente. |
@@ -203,4 +174,4 @@ Este repositorio incluye `render.yaml`.
 
 - No pongas `OPENAI_API_KEY` en `index.html`, `script.js` ni commits.
 - `.env` esta ignorado por Git y solo debe usarse localmente.
-- Las consultas a autoridades se hacen desde el backend.
+- La app abre los catálogos de autoridades mediante enlaces manuales; el backend solo genera propuestas y administra el historial.

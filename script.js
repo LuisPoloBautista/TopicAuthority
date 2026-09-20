@@ -183,20 +183,13 @@ function renderTopics(headings, generated = false, output = document.getElementB
       <div class="koha-actions">
         <button type="button" class="search-local">Buscar en el historial</button>
         ${(generated || heading.canUse) && kohaParentOrigin ? '<button type="button" class="use-new">Usar como nuevo</button>' : ''}
-        <button type="button" class="search-external">Consulta externa (puede tardar)</button>
       </div>
       <div class="catalog-links">${catalogLinks(heading.label)}</div>
       <div class="local-results" aria-live="polite"></div>
-      <div class="authority-results"></div>
     </article>`).join('') + '</div>';
   [...output.querySelectorAll('.topic-card')].forEach((card, index) => {
     const heading = headings[index];
     card.querySelector('.search-local').addEventListener('click', () => showLocalMatches(card, heading).catch(() => {}));
-    card.querySelector('.search-external').addEventListener('click', async (event) => {
-      event.target.disabled = true;
-      await loadAuthoritiesForTopic(heading.label, card);
-      event.target.disabled = false;
-    });
     card.querySelector('.use-new')?.addEventListener('click', async (event) => {
       event.target.disabled = true;
       try {
@@ -209,14 +202,6 @@ function renderTopics(headings, generated = false, output = document.getElementB
     });
     if (generated) showLocalMatches(card, heading, true).catch(() => {});
   });
-}
-
-function sourcePriority(source) {
-  return ({ LCSH: 0, BNE: 1, UNESCO: 2, EuroVoc: 3, Wikidata: 4, VIAF: 5, DBpedia: 6 })[source] ?? 99;
-}
-
-function sourceDisplayName(source) {
-  return source === "LCSH" ? "Library of Congress Subject Headings (LCSH)" : source;
 }
 
 function marcAuthority(item) {
@@ -248,58 +233,6 @@ function useAuthority(item) {
     version: 1,
     authority: marcAuthority(item)
   }, kohaParentOrigin);
-}
-
-function renderAuthorities(container, authorities, sources = []) {
-  if (!authorities.length && !sources.length) {
-    container.innerHTML = "<p class='authority-empty'>No se encontró una autoridad suficientemente cercana. Prueba un término más general o una variante.</p>";
-    return;
-  }
-
-  authorities.sort((a, b) => sourcePriority(a.source) - sourcePriority(b.source));
-  const bySource = authorities.reduce((acc, item) => {
-    const source = item.source || "Fuente";
-    acc[source] ||= [];
-    acc[source].push(item);
-    return acc;
-  }, {});
-
-  const resultHtml = Object.entries(bySource).map(([source, items]) => `
-    <div class="authority-source">
-      <h3>${escapeHtml(sourceDisplayName(source))}</h3>
-      <ul>
-        ${items.map(item => `
-          <li>
-            <a href="${escapeHtml(item.url || item.uri)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.label || item.term)}</a>
-            ${item.type ? `<span class="authority-type">${escapeHtml(item.type)}</span>` : ""}
-            ${item.match ? `<span class="authority-match-badge authority-match-${escapeHtml(item.match)}">${escapeHtml({exact:"Coincidencia exacta",label:"Término preferido",partial:"Coincidencia parcial",alias:"Variante autorizada",fuzzy:"Coincidencia aproximada"}[item.match] || "Relacionado")}</span>` : ""}
-            ${item.confidence ? `<span class="authority-score">${escapeHtml(item.confidence)}%</span>` : ""}
-            ${item.component || item.query ? `<div class="authority-match">Coincidencia: ${escapeHtml(item.component || "consulta")} ${item.query ? `(${escapeHtml(item.query)})` : ""}</div>` : ""}
-            ${item.description || item.abstract ? `<p>${escapeHtml(item.description || item.abstract)}</p>` : ""}
-            ${kohaParentOrigin ? `<button type="button" class="use-authority-btn">Usar autoridad</button>` : ""}
-          </li>
-        `).join("")}
-      </ul>
-    </div>
-  `).join("");
-
-  const sourcesWithResults = new Set(Object.keys(bySource));
-  const statusHtml = sources
-    .filter(source => !sourcesWithResults.has(source.source) && source.status !== "ok")
-    .map(source => `
-      <div class="authority-source authority-source-empty">
-        <h3>${escapeHtml(sourceDisplayName(source.source))}</h3>
-        <p>${source.status === "error" ? "La fuente no estuvo disponible durante esta consulta." : "No encontró una autoridad con relevancia suficiente."}</p>
-      </div>
-    `).join("");
-
-  container.innerHTML = resultHtml + statusHtml;
-  if (kohaParentOrigin) {
-    const orderedItems = Object.values(bySource).flat();
-    container.querySelectorAll(".use-authority-btn").forEach((button, index) => {
-      button.addEventListener("click", () => useAuthority(orderedItems[index]));
-    });
-  }
 }
 
 async function searchOneTopic(topic) {
@@ -334,22 +267,6 @@ function updateCatalogLinks() {
   document.getElementById('catalogLinks').innerHTML = catalogLinks(authorityTermInput.value.trim());
 }
 authorityTermInput.addEventListener('input', updateCatalogLinks);
-
-async function loadAuthoritiesForTopic(topic, card) {
-  const container = card.querySelector(".authority-results");
-  container.textContent = 'Consultando catálogos de autoridades...';
-  try {
-    const res = await fetch(`/api/topics/${encodeURIComponent(topic)}/authorities`);
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || res.statusText);
-    }
-    const data = await res.json();
-    renderAuthorities(container, data.authorities || [], data.sources || []);
-  } catch (error) {
-    container.innerHTML = `<p class="authority-error">No se pudieron consultar autoridades en este momento. Intenta de nuevo más tarde.</p>`;
-  }
-}
 
 async function analyzeText(sourceText, existingMain = "", mode = "pdf", output = pdfOutput) {
   if (!sourceText) {

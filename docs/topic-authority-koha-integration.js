@@ -6,7 +6,7 @@
   "use strict";
 
   const AUTHORITY_ORIGIN = "https://topicauthority.onrender.com";
-  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20260919";
+  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20260919b";
   const CATALOGUING_PATH = "/cgi-bin/koha/cataloguing/addbiblio.pl";
   let authorityFrame = null;
   let target650Id = null;
@@ -50,6 +50,29 @@
     });
   }
 
+  async function readSavedMarc(id) {
+    const sources = [
+      { name: 'exportación', url: '/cgi-bin/koha/catalogue/export.pl?format=marcxml&op=export&bib=' + encodeURIComponent(id) },
+      { name: 'API', url: '/api/v1/biblios/' + encodeURIComponent(id), headers: { Accept: 'application/marcxml+xml' } }
+    ];
+    const failures = [];
+    for (const source of sources) {
+      try {
+        const response = await fetch(source.url, { credentials: 'same-origin', cache: 'no-store', headers: source.headers, signal: AbortSignal.timeout(15000) });
+        if (!response.ok) { failures.push(source.name + ': HTTP ' + response.status); continue; }
+        const xml = new DOMParser().parseFromString(await response.text(), 'application/xml');
+        if (xml.querySelector('parsererror') || !xml.getElementsByTagNameNS('*', 'record').length) {
+          failures.push(source.name + ': no devolvió MARCXML');
+          continue;
+        }
+        return xml;
+      } catch (error) {
+        failures.push(source.name + ': ' + (error.name === 'TimeoutError' ? 'tiempo de espera agotado' : 'falló la conexión'));
+      }
+    }
+    throw new Error('La sincronización quedó pendiente: no se pudo leer el registro guardado (' + failures.join('; ') + '). Comprueba la sesión y los permisos de lectura en Koha.');
+  }
+
   async function confirmSavedRecord() {
     const raw = sessionStorage.getItem(PENDING_KEY);
     if (!raw) return;
@@ -59,11 +82,7 @@
     const id = new URLSearchParams(location.search).get('biblionumber');
     if (!id || (pending.recordId && pending.recordId !== id)) return;
     if (!pending.recordId && !document.referrer.includes(CATALOGUING_PATH)) return;
-    const exportUrl = '/cgi-bin/koha/catalogue/export.pl?format=marcxml&bib=' + encodeURIComponent(id);
-    const response = await fetch(exportUrl, { credentials: 'same-origin' });
-    if (!response.ok) throw new Error('No se pudo verificar el MARC guardado.');
-    const xml = new DOMParser().parseFromString(await response.text(), 'application/xml');
-    if (xml.querySelector('parsererror') || !xml.getElementsByTagNameNS('*', 'record').length) throw new Error('Koha no devolvió un registro MARCXML válido.');
+    const xml = await readSavedMarc(id);
     const saved = [...xml.getElementsByTagNameNS('*', 'datafield')].filter(f => f.getAttribute('tag') === '650').map(field => {
       const parts = [...field.getElementsByTagNameNS('*', 'subfield')];
       return { main: parts.find(p => p.getAttribute('code') === 'a')?.textContent.trim() || '',
