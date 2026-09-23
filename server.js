@@ -22,7 +22,9 @@ if (existsSync(envPath)) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const OPENAI_RESPONSES_URL = process.env.OPENAI_RESPONSES_URL || 'https://api.openai.com/v1/responses';
+const OPENAI_INPUT_TOKENS_URL = OPENAI_RESPONSES_URL.replace(/\/$/, '') + '/input_tokens';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.5';
+const INPUT_TOKEN_LIMITS = Object.freeze({ marc: 2000, pdf: 12000 });
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
   .split(',')
   .map(origin => origin.trim())
@@ -58,24 +60,16 @@ Contenido a analizar:
 ${text}`;
 }
 
-async function generateTopics(text, existingMain = '', mode = 'pdf') {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not configured on the server');
-  }
-
-  const response = await fetch(OPENAI_RESPONSES_URL, {
+// One HTTP attempt per operation: no retries, fallbacks or POST redirects.
+async function requestOpenAI(url, body, apiKey) {
+  const response = await fetch(url, {
     method: 'POST',
+    redirect: 'error',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      input: [{ role: 'user', content: [{ type: 'input_text', text: buildTopicPrompt(text, existingMain, mode) }] }],
-      max_output_tokens: mode === 'pdf' ? 2500 : 1200,
-      store: false,
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(Number(process.env.OPENAI_TIMEOUT_MS || 120000)),
   });
 
@@ -83,6 +77,59 @@ async function generateTopics(text, existingMain = '', mode = 'pdf') {
   if (!response.ok) {
     throw new Error(data.error?.message || `OpenAI API error: ${response.status}`);
   }
+  return data;
+}
+
+async function generateTopics(text, existingMain = '', mode = 'pdf') {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not configured on the server');
+  }
+
+  const limit = INPUT_TOKEN_LIMITS[mode];
+  const countInput = async content => {
+    const input = {
+      model: OPENAI_MODEL,
+      input: [{ role: 'user', content: [{ type: 'input_text', text: buildTopicPrompt(content, existingMain, mode) }] }],
+    };
+    const count = await requestOpenAI(OPENAI_INPUT_TOKENS_URL, input, apiKey);
+    if (!Number.isSafeInteger(count?.input_tokens) || count.input_tokens <= 0) {
+      throw new Error('Conteo de tokens inválido.');
+    }
+    return { input, tokens: count.input_tokens };
+  };
+  // Count the exact same input, including prompt, existing main and message framing.
+  // Fail closed if counting is unavailable; never generate using an estimate.
+  let fitted;
+  try {
+    fitted = await countInput(text);
+    if (fitted.tokens > limit) {
+      // Keep instructions and 650$a intact; trim only the document's suffix.
+      // Count distinct prefixes, never retry failed requests or generate summaries.
+      const characters = Array.from(text); // Never split a Unicode surrogate pair.
+      fitted = await countInput('');
+      if (fitted.tokens > limit) throw new Error('Las instrucciones exceden el presupuesto.');
+      let low = 0;
+      let high = characters.length - 1;
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
+        const candidate = await countInput(characters.slice(0, middle).join(''));
+        if (candidate.tokens <= limit) {
+          fitted = candidate;
+          low = middle;
+        } else {
+          high = middle - 1;
+        }
+      }
+    }
+  } catch {
+    throw Object.assign(new Error('No se pudo verificar el límite de tokens. No se solicitó la generación ni se hicieron reintentos automáticos.'), { status: 502 });
+  }
+  const data = await requestOpenAI(OPENAI_RESPONSES_URL, {
+    ...fitted.input,
+    max_output_tokens: mode === 'pdf' ? 2500 : 1200,
+    store: false,
+  }, apiKey);
 
   const outputText = data.output_text
     || (data.output || [])
@@ -141,7 +188,7 @@ app.post('/api/topics', async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error('Error in /api/topics:', error);
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ error: error.message });
   }
 });
 

@@ -17,6 +17,10 @@ test('API generates typed headings and counts confirmed records only', async t =
     let body = '';
     for await (const chunk of req) body += chunk;
     prompt = JSON.parse(body).input[0].content[0].text;
+    if (req.url === '/input_tokens') {
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(JSON.stringify({ input_tokens: 500 }));
+    }
     generations++;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ output_text: JSON.stringify(Array.from({ length: prompt.includes('UN solo') ? 1 : 5 }, () => h)) }));
