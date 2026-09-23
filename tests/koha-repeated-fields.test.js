@@ -3,6 +3,53 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
+test('authority metadata is optional but missing heading subfields still block before mutation', async () => {
+  const source = await readFile(new URL('../docs/topic-authority-koha-integration.js', import.meta.url), 'utf8');
+  const instrumented = source.replace('  function initialize() {', '  globalThis.importInto = (node, authority) => { target650Node = node; useAuthority(authority); };\n  function initialize() {');
+  const context = vm.createContext({
+    Event: class {},
+    document: { readyState: 'loading', addEventListener() {}, getElementById: () => ({ style: {} }), body: { style: {} } }
+  });
+  vm.runInContext(instrumented, context);
+  const authority = { label: 'Botánica', uri: 'http://vocabularies.unesco.org/thesaurus/concept230', sourceCode: 'unescot', ind2: '7' };
+  function field(codes) {
+    const editors = Object.fromEntries(codes.map(code => [code, { value: 'previous-' + code, dispatchEvent() {} }]));
+    const lines = codes.map(code => ({
+      id: 'subfield650' + code,
+      querySelector(selector) {
+        if (selector.startsWith('input[name')) return selector.includes('_code_' + code + '_') ? { closest: () => this } : null;
+        return editors[code];
+      }
+    }));
+    const indicators = [{ value: ' ' }, { value: '4' }];
+    return {
+      isConnected: true, editors, indicators,
+      querySelector: selector => selector.startsWith('.subfield_line')
+        ? lines.find(line => selector.includes(line.id))
+        : lines.map(line => line.querySelector(selector)).find(Boolean),
+      querySelectorAll: selector => selector === '.subfield_line' ? lines : indicators
+    };
+  }
+  for (const codes of [['a'], ['a', '2'], ['a', '0'], ['a', '0', '2']]) {
+    const node = field(codes);
+    context.importInto(node, authority);
+    assert.equal(node.editors.a.value, 'Botánica');
+    if (node.editors['0']) assert.equal(node.editors['0'].value, authority.uri);
+    if (node.editors['2']) assert.equal(node.editors['2'].value, 'unescot');
+    assert.equal(node.indicators[1].value, codes.includes('2') ? '7' : '4');
+  }
+  const lcsh = field(['a']);
+  context.importInto(lcsh, { label: 'Botany', uri: 'http://id.loc.gov/authorities/subjects/sh85015976', ind2: '0' });
+  assert.equal(lcsh.indicators[1].value, '0');
+  const missingSubdivision = field(['a', '0', '2']);
+  assert.throws(() => context.importInto(missingSubdivision, {
+    ...authority, subfields: [{ code: 'a', value: 'Botánica' }, { code: 'x', value: 'Historia' }]
+  }), /650\$x/);
+  assert.equal(missingSubdivision.editors.a.value, 'previous-a');
+  assert.equal(missingSubdivision.editors['0'].value, 'previous-0');
+  assert.equal(missingSubdivision.editors['2'].value, 'previous-2');
+});
+
 test('a copied launcher targets its own 650 even with duplicate DOM IDs and stages the correct heading', async () => {
   const source = await readFile(new URL('../docs/topic-authority-koha-integration.js', import.meta.url), 'utf8');
   assert.match(source, /addEventListener\('click', onLauncherClick, true\)/);

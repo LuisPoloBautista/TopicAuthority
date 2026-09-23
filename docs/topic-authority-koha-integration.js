@@ -231,7 +231,7 @@
     if (!node) throw new Error("Ya no se encuentra la etiqueta 650 seleccionada");
     const subfields = authority.subfields || [{ code: 'a', value: authority.label }];
     const desired = [...subfields, { code: '0', value: authority.uri || '' }, { code: '2', value: authority.sourceCode || '' }];
-    // Validate all destinations before making any change to the form.
+    // Heading components are required; optional authority metadata depends on the framework.
     const destinations = [];
     const used = new Map();
     for (const part of desired) {
@@ -239,7 +239,7 @@
         line.querySelector('input[name^="tag_650_code_' + part.code + '_"]') || line.id.startsWith('subfield650' + part.code)
       ).map(line => line.querySelector('.input_marceditor, input[id^=tag_], textarea[id^=tag_], select[id^=tag_]')).filter(Boolean);
       const offset = used.get(part.code) || 0;
-      if (!editors[offset] && part.value) throw new Error('Agrega al framework la ocurrencia ' + (offset + 1) + ' de 650$' + part.code + ' y vuelve a importar.');
+      if (!editors[offset] && part.value && !['0', '2'].includes(part.code)) throw new Error('Agrega al framework la ocurrencia ' + (offset + 1) + ' de 650$' + part.code + ' y vuelve a importar.');
       used.set(part.code, offset + 1);
       if (editors[offset]) destinations.push([editors[offset], part.value]);
     }
@@ -258,7 +258,9 @@
     });
     const indicators = node.querySelectorAll('input.indicator');
     if (indicators[0]) indicators[0].value = authority.ind1 || ' ';
-    if (indicators[1]) indicators[1].value = authority.ind2 || '4';
+    // Indicator 7 requires a source code in $2. Never leave an incomplete source designation.
+    const ind2 = authority.ind2 || '4';
+    if (indicators[1]) indicators[1].value = ind2 === '7' && !fieldValue(node, '650', '2') ? '4' : ind2;
     if (authority.localHeading) staged.set(node, authority.localHeading);
     else staged.delete(node);
     closeAuthority();
