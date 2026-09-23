@@ -104,6 +104,16 @@ test('a copied launcher targets its own 650 even with duplicate DOM IDs and stag
   context.handlers.stageSave();
   assert.equal(pending.headings.length, 1);
   assert.equal(pending.headings[0].main, second.editor.value);
+  for (const source of ['Wikidata', 'UNESCO', 'LCSH']) {
+    const label = source === 'LCSH' ? 'Botany' : 'Botánica';
+    context.handlers.useAuthority({ label, source, uri: 'https://example.test/authority', sourceCode: source.toLowerCase(), ind2: '7' });
+    context.handlers.stageSave();
+    assert.deepEqual(pending.headings, [{ main: label, subdivisions: [] }]);
+    assert.equal(first.editor.value, 'Primero');
+    second.editor.value = 'Edición manual posterior';
+    context.handlers.stageSave();
+    assert.deepEqual(pending.headings, []);
+  }
   second.node.isConnected = false;
   context.handlers.stageSave();
   assert.equal(pending.headings.length, 0);

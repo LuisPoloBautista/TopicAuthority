@@ -261,8 +261,9 @@
     // Indicator 7 requires a source code in $2. Never leave an incomplete source designation.
     const ind2 = authority.ind2 || '4';
     if (indicators[1]) indicators[1].value = ind2 === '7' && !fieldValue(node, '650', '2') ? '4' : ind2;
-    if (authority.localHeading) staged.set(node, authority.localHeading);
-    else staged.delete(node);
+    // Track every imported heading, including external catalogs without localHeading.
+    // Capture what actually reached the form; usage is confirmed only after Koha saves it.
+    staged.set(node, headingFromNode(node));
     closeAuthority();
   }
 
