@@ -13,8 +13,9 @@ function element(tagName) {
     setAttribute() {},
     addEventListener(type, handler) { this.events[type] = handler; },
     querySelectorAll: () => [],
+    querySelector: () => null,
     append(...children) { this.children.push(...children); },
-    replaceChildren() { this.children = []; }
+    replaceChildren(...children) { this.children = children; }
   };
 }
 function ui() {
@@ -44,8 +45,8 @@ test('UI offers subdivision generation for an existing 650$a and heading generat
   await nodes.get('analyzeKohaBtn').events.click();
   assert.equal(JSON.parse(requests[0].options.body).existingMain, 'Educación');
   assert.equal((nodes.get('marcOutput').innerHTML.match(/class="topic-card"/g) || []).length, 1);
-  assert.doesNotMatch(nodes.get('marcOutput').innerHTML, /search-external|Consulta externa|Buscar manualmente/);
-  assert.equal(nodes.get('output').innerHTML, '');
+  assert.match(nodes.get('marcOutput').innerHTML, /catalog-results/);
+  assert.match(nodes.get('output').innerHTML, /Educación/);
   await context.analyzeText('Texto PDF', '', 'pdf', nodes.get('pdfOutput'));
   assert.equal((nodes.get('pdfOutput').innerHTML.match(/class="topic-card"/g) || []).length, 5);
   assert.equal((nodes.get('marcOutput').innerHTML.match(/class="topic-card"/g) || []).length, 1);
@@ -71,4 +72,47 @@ test('automatic history warning imports typed MARC data without recording a use'
   assert.equal(message.authority.ind2, '4');
   assert.equal(requests.some(r => r.url.includes('heading-usage')), false);
   assert.match(context.catalogLinks('Educación & México'), /Educaci%C3%B3n%20%26%20M%C3%A9xico/);
+});
+
+test('catalogs run in parallel without AI and import to the selected target only', async () => {
+  const { context, messages } = ui();
+  context.receiveKohaContext({ existingMain: '', targetId: 'second-650' }, 'https://koha.test');
+  const pending = [];
+  context.fetch = url => new Promise(resolve => pending.push({ url, resolve }));
+  const container = element('div');
+  const card = { isConnected: true, querySelector: () => container };
+  const done = context.showCatalogMatches(card, { main: 'Botánica sistemática' });
+  assert.equal(pending.length, 3);
+  assert.equal(pending.every(p => p.url.startsWith('/api/authorities?')), true);
+  for (const p of pending) {
+    p.resolve({ ok: true, json: async () => ({ queries: ['Botánica sistemática', 'Botánica'], results: [
+      { source: 'UNESCO', label: 'Botánica', uri: 'http://vocabularies.unesco.org/thesaurus/concept230', canImport: true, match: 'related' }
+    ] }) });
+  }
+  await done;
+  const row = container.children[0].children[2];
+  assert.match(row.children[1].textContent, /relacionado/);
+  row.children[2].events.click();
+  const imported = messages.at(-1);
+  assert.equal(imported.targetId, 'second-650');
+  assert.equal(imported.authority.label, 'Botánica');
+  assert.equal(imported.authority.sourceCode, 'unescot');
+  assert.equal(imported.authority.ind2, '7');
+  context.receiveKohaContext({ existingMain: '', targetId: 'third-650' }, 'https://koha.test');
+  const count = messages.length;
+  row.children[2].events.click();
+  assert.equal(messages.length, count);
+});
+
+test('late catalog responses cannot populate a different 650', async () => {
+  const { context } = ui();
+  context.receiveKohaContext({ existingMain: '', targetId: 'first' }, 'https://koha.test');
+  const pending = [];
+  context.fetch = () => new Promise(resolve => pending.push(resolve));
+  const container = element('div');
+  const done = context.showCatalogMatches({ isConnected: true, querySelector: () => container }, { main: 'Botánica' });
+  context.receiveKohaContext({ existingMain: '', targetId: 'second' }, 'https://koha.test');
+  pending.forEach(resolve => resolve({ ok: true, json: async () => ({ queries: ['Botánica'], results: [] }) }));
+  await done;
+  assert.equal(container.children.every(section => section.children[1].textContent === 'Buscando…'), true);
 });

@@ -6,7 +6,7 @@
   "use strict";
 
   const AUTHORITY_ORIGIN = "https://topicauthority.onrender.com";
-  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20260920";
+  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20260923";
   const CATALOGUING_PATH = "/cgi-bin/koha/cataloguing/addbiblio.pl";
   let authorityFrame = null;
   let target650Node = null;
@@ -210,6 +210,7 @@
     const node = button.closest('.tag');
     if (!node || tagNumber(node) !== '650') return;
     event.preventDefault();
+    event.stopImmediatePropagation?.();
     openAuthority(node);
   }
 
@@ -307,13 +308,14 @@
     modal.addEventListener("click", function (event) { if (event.target === modal) closeAuthority(); });
 
     // Delegation also handles buttons copied by Koha when a 650 is repeated.
-    document.addEventListener('click', onLauncherClick);
+    document.addEventListener('click', onLauncherClick, true);
     addButtons();
     new MutationObserver(addButtons).observe(document.getElementById("f") || document.body, { childList: true, subtree: true });
     window.addEventListener("message", function (event) {
       if (event.origin !== AUTHORITY_ORIGIN || event.source !== authorityFrame.contentWindow || !event.data) return;
       if (event.data.type === "TOPIC_AUTHORITY_READY") sendContext();
       if (event.data.type === "TOPIC_AUTHORITY_USE") {
+        if (event.data.targetId !== targetTokens.get(currentTarget())) return;
         try { useAuthority(event.data.authority || {}); }
         catch (error) { alert("No se pudo usar la autoridad: " + error.message); }
       }

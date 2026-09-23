@@ -209,6 +209,70 @@ async function showLocalMatches(card, heading, automatic = false) {
   }
 }
 
+async function showCatalogMatches(card, heading) {
+  const container = card.querySelector('.catalog-results');
+  const version = viewVersion;
+  container.replaceChildren();
+  await Promise.all(['UNESCO', 'Wikidata', 'LCSH'].map(async source => {
+    const section = document.createElement('section');
+    const title = document.createElement('h4');
+    title.textContent = source;
+    const status = document.createElement('p');
+    status.textContent = 'Buscando…';
+    section.append(title, status); container.append(section);
+    const run = async () => {
+      status.textContent = 'Buscando…';
+      try {
+        const response = await fetch('/api/authorities?source=' + source + '&q=' + encodeURIComponent(heading.main));
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'No se pudo consultar el catálogo.');
+        if (version !== viewVersion || !card.isConnected) return;
+        section.replaceChildren(title);
+        status.textContent = data.results.length ? 'Consulta: ' + data.queries.join(' → ') : 'Sin coincidencias. Consulta: ' + data.queries.join(' → ');
+        section.append(status);
+        if (source === 'LCSH') {
+          const note = document.createElement('p');
+          note.textContent = 'LCSH usa principalmente inglés; puedes buscar un término en inglés.';
+          section.append(note);
+        }
+        for (const item of data.results) {
+          const row = document.createElement('div'); row.className = 'catalog-result';
+          const link = document.createElement('a');
+          const uri = new URL(item.uri);
+          if (!['http:', 'https:'].includes(uri.protocol)) continue;
+          link.href = uri.href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+          link.textContent = item.label;
+          const detail = document.createElement('p');
+          detail.textContent = (item.match === 'exact' ? 'Coincidencia exacta' : 'Término relacionado; revisa su pertinencia') + (item.description ? ' · ' + item.description : '');
+          row.append(link, detail);
+          if (kohaParentOrigin && item.canImport) {
+            const button = document.createElement('button');
+            button.type = 'button'; button.textContent = 'Usar este término';
+            button.addEventListener('click', () => {
+              if (version !== viewVersion || !card.isConnected) return;
+              useAuthority(item);
+            });
+            row.append(button);
+          } else if (!item.canImport) {
+            const note = document.createElement('p');
+            note.textContent = 'Encabezamiento compuesto: revisa los subcampos en el catálogo antes de copiarlo.';
+            row.append(note);
+          }
+          section.append(row);
+        }
+      } catch (error) {
+        if (version !== viewVersion || !card.isConnected) return;
+        status.textContent = error.message;
+        const retry = document.createElement('button');
+        retry.type = 'button'; retry.textContent = 'Reintentar ' + source;
+        retry.addEventListener('click', () => { retry.remove(); run(); });
+        section.append(retry);
+      }
+    };
+    await run();
+  }));
+}
+
 function renderTopics(headings, generated = false, output = document.getElementById("output")) {
   const version = viewVersion;
   output.innerHTML = '<div class="topic-list">' + headings.map((heading, index) => `
@@ -220,9 +284,13 @@ function renderTopics(headings, generated = false, output = document.getElementB
         ${(generated || heading.canUse) && kohaParentOrigin ? '<button type="button" class="use-new">Usar como nuevo</button>' : ''}
       </div>
       <div class="local-results" aria-live="polite"></div>
+      <p>Catálogos externos · sin consumo de IA. Usar un término reemplaza el 650 seleccionado y sus subdivisiones.</p>
+      <div class="catalog-results" aria-live="polite"></div>
+      <div class="catalog-links">${catalogLinks(heading.main)}</div>
     </article>`).join('') + '</div>';
   [...output.querySelectorAll('.topic-card')].forEach((card, index) => {
     const heading = headings[index];
+    showCatalogMatches(card, heading);
     card.querySelector('.search-local').addEventListener('click', () => showLocalMatches(card, heading).catch(() => {}));
     card.querySelector('.use-new')?.addEventListener('click', async (event) => {
       event.target.disabled = true;
@@ -265,6 +333,7 @@ function useAuthority(item) {
   window.parent.postMessage({
     type: "TOPIC_AUTHORITY_USE",
     version: 1,
+    targetId: kohaContext?.targetId,
     authority: marcAuthority(item)
   }, kohaParentOrigin);
 }
@@ -277,7 +346,8 @@ async function searchOneTopic(topic) {
     ? { ...previous, label: topic, canUse: previous.subdivisions.length <= 2 }
     : { main: topic.split(/\s*--\s*/)[0], label: topic, subdivisions: [], canUse: !topic.includes('--') };
   renderTopics([heading]);
-  await showLocalMatches(output.querySelector('.topic-card'), heading).catch(() => {});
+  const card = output.querySelector('.topic-card');
+  if (card) await showLocalMatches(card, heading).catch(() => {});
 }
 
 function receiveKohaContext(context, origin) {
@@ -295,6 +365,7 @@ function receiveKohaContext(context, origin) {
   marcOutput.textContent = 'Aquí aparecerá un solo encabezamiento con hasta dos subdivisiones.';
   pdfOutput.textContent = 'Aquí aparecerán las cinco propuestas del PDF.';
   kohaContextMessage.textContent = existing ? `650$a: ${existing}. Se conserva el encabezamiento principal y se sugieren hasta dos subdivisiones en total, no cinco alternativas.` : '650$a vacío: se propondrá un solo encabezamiento con hasta dos subdivisiones. Las cinco propuestas se generan únicamente desde un PDF.';
+  if (existing) searchOneTopic(authorityTermInput.value.trim());
 }
 
 function updateCatalogLinks() {

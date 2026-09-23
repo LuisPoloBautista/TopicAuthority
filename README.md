@@ -9,7 +9,7 @@ Espacio MARC: 650$a con información -> conservarlo + hasta 2 subdivisiones en t
 Espacio MARC: 650$a vacío -> 1 encabezamiento + hasta 2 subdivisiones
 Espacio PDF: 5 temas independientes del 650$a, hasta 2 subdivisiones por tema
   -> comprobar historial local, advertir coincidencias e importar una forma usada
-  -> consultar manualmente UNESCO, Wikidata o LCSH, sin consulta externa dentro de la app
+  -> consultar automáticamente UNESCO, Wikidata y LCSH, sin tokens de IA
   -> transferir a Koha -> guardar registro -> verificar MARCXML -> contabilizar uso
 ```
 
@@ -19,7 +19,7 @@ El integrador actualizado está incluido en este repositorio: [`docs/topic-autho
 
 Los botones de los campos 650 repetidos usan un único manejador de clics en el documento, que resuelve el campo desde el botón pulsado. Esto permite usar botones clonados por Koha sin depender de sus eventos originales ni de identificadores DOM únicos.
 
-El botón **Ampliar ventana / Restaurar tamaño** está en la cabecera del modal de Koha. La app recibe `existingMain`, `existingTerm`, `targetId` y `marcText` por `postMessage`. No genera ni consulta catálogos externos automáticamente: el usuario elige la acción. Sí comprueba el historial al mostrar propuestas de IA y nuevamente antes de transferirlas, incluso si no se pulsó «Buscar».
+El botón **Ampliar ventana / Restaurar tamaño** está en la cabecera del modal de Koha. La app recibe `existingMain`, `existingTerm`, `targetId` y `marcText` por `postMessage`. Consulta automáticamente los catálogos al abrir un 650 con texto y para cada propuesta generada; la generación de IA sigue requiriendo un clic. Comprueba el historial al mostrar propuestas de IA y nuevamente antes de transferirlas. El manejador de botones usa captura para evitar interferencias de eventos clonados; las importaciones incluyen el identificador del campo destino y se rechazan si ya cambió. Actualiza tanto la app como el integrador de IntranetUserJS.
 
 Las propuestas nuevas usan indicador 2 = `4` (fuente no especificada), sin URI ni código de autoridad inventados. Las subdivisiones se transfieren a sus subcampos, conservando el orden y las repeticiones. Si falta un subcampo o una ocurrencia en el framework, la transferencia se detiene antes de modificar el formulario y avisa cuál agregar.
 
@@ -39,7 +39,9 @@ El JSON conserva `recordInfo`, con origen de Koha y biblionumber, asociado a los
 
 Configura `HEADING_STORE_PATH` en un **disco persistente**, por ejemplo `/var/data/topic-authority/used-headings.json`, para conservarlo al desplegar de nuevo. El `render.yaml` existente usa un plan gratuito sin disco persistente: el almacenamiento local de ese despliegue no garantiza conservar el historial. Ejecuta una sola instancia Node con este almacenamiento; para varias instancias hace falta una base de datos compartida. Respalda el JSON para conservar también la contabilidad por registro.
 
-Las búsquedas manuales abren el término codificado en [UNESCO](https://vocabularies.unesco.org/unesco/es/search), [Wikidata](https://www.wikidata.org/wiki/Special:Search) y [LCSH](https://id.loc.gov/search/). Se retiraron el botón, el código de consulta externa de la interfaz y los endpoints `/topics/:topic/authorities` y `/api/topics/:topic/authorities`. La app conserva únicamente los enlaces de búsqueda manual; no se agregó un cliente Z39.50.
+`GET /api/authorities?source=UNESCO&q=Botánica` consulta los catálogos públicos desde Node mediante `authority-catalogs.js`, sin Python ni OpenAI. Usa la [API REST de UNESCO](https://vocabularies.unesco.org/api), la [API de Wikidata](https://www.mediawiki.org/wiki/Wikibase/API) y la autosugerencia de materias LCSH. Cada tarjeta consulta las tres fuentes en paralelo y muestra cada respuesta al llegar. Hay un presupuesto total de 4.5 segundos por fuente, caché de diez minutos (máximo 300 consultas) y reutilización de solicitudes simultáneas. Los errores permiten reintentar manualmente y no se presentan como ausencia de resultados.
+
+Se busca el encabezamiento principal; si no hay resultados se prueba su primera palabra significativa (por ejemplo, «Botánica sistemática» → «Botánica»). Se aprovechan las variantes que devuelven los catálogos, sin traducción ni inferencias de IA. LCSH usa principalmente inglés. Las coincidencias relacionadas requieren revisión. «Usar este término» reemplaza el 650 seleccionado, limpia subdivisiones anteriores y transfiere URI a $0, código a $2 e indicador según la fuente; el framework debe incluir esos subcampos. Los encabezamientos compuestos LCSH con `--` se muestran para revisión, sin importación automática porque su texto no identifica los códigos de subdivisión. Se conservan enlaces manuales en cada tarjeta.
 
 El módulo Python independiente (ya no conectado a la app) no usa embeddings, bases vectoriales ni entrenamiento. BNE se compara localmente con RapidFuzz a partir de los archivos descargados del Catalogo de autoridades de BNE Lab: https://bnelab.bne.es/dato/catalogo-de-autoridades/. Las demas equivalencias se obtienen mediante consultas directas a fuentes externas.
 
@@ -66,7 +68,7 @@ python3 -m authority_search.authority_manager "Botanica mexicana del siglo XVIII
 
 ## Fuentes del módulo Python independiente
 
-Estas fuentes solo se utilizan al ejecutar el módulo Python por separado. La app no las consulta: muestra enlaces manuales a UNESCO, Wikidata y LCSH, y busca encabezamientos usados en su JSON local.
+Estas implementaciones se utilizan al ejecutar el módulo Python por separado. La app utiliza su propio cliente Node para UNESCO, Wikidata y LCSH, además del historial JSON local.
 
 - VIAF: autosugerencia de autoridades `https://www.viaf.org/viaf/AutoSuggest`
 - Wikidata: API `wbsearchentities`
@@ -180,4 +182,4 @@ Este repositorio incluye `render.yaml`.
 
 - No pongas `OPENAI_API_KEY` en `index.html`, `script.js` ni commits.
 - `.env` esta ignorado por Git y solo debe usarse localmente.
-- La app abre los catálogos de autoridades mediante enlaces manuales; el backend solo genera propuestas y administra el historial.
+- La app consulta UNESCO, Wikidata y LCSH sin tokens de IA; conserva enlaces manuales para revisar los resultados.

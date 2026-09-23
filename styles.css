@@ -550,3 +550,8 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
     margin-left: 0;
   }
 }
+
+.catalog-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.catalog-results section { padding: 12px; border: 1px solid #ddd; border-radius: 6px; min-width: 0; }
+.catalog-result { border-top: 1px solid #ddd; padding: 10px 0; overflow-wrap: anywhere; }
+.catalog-result p { font-size: .9em; }

@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'fs';
 import { createHash } from 'node:crypto';
 import { HeadingStore } from './heading-store.js';
 import { parseGeneratedHeadings } from './headings.js';
+import { createCatalogSearch } from './authority-catalogs.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -154,6 +155,12 @@ async function cachedGeneration(text, main, mode) {
   try { return await promise; }
   catch (error) { generationCache.delete(key); throw error; }
 }
+
+const searchCatalog = createCatalogSearch();
+app.get('/api/authorities', async (req, res) => {
+  try { res.json(await searchCatalog(req.query.source, req.query.q)); }
+  catch (error) { res.status(error.status || 502).json({ error: error.status ? error.message : 'El catálogo no respondió a tiempo o no está disponible. Puedes reintentar o abrir el enlace manual.' }); }
+});
 
 app.get('/api/headings', async (req, res) => {
   try { res.json({ headings: await headingStore.search(String(req.query.q || '')) }); }

@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 test('a copied launcher targets its own 650 even with duplicate DOM IDs and stages the correct heading', async () => {
   const source = await readFile(new URL('../docs/topic-authority-koha-integration.js', import.meta.url), 'utf8');
+  assert.match(source, /addEventListener\('click', onLauncherClick, true\)/);
   // Expose internal handlers only inside the test VM; no test hooks ship to Koha.
   const instrumented = source.replace('  function initialize() {', '  globalThis.handlers = { onLauncherClick, useAuthority, stageSave };\n  function initialize() {');
   function field(value) {
@@ -39,7 +40,9 @@ test('a copied launcher targets its own 650 even with duplicate DOM IDs and stag
   vm.runInContext(instrumented, context);
   const click = node => {
     const copiedButton = { closest: () => node }; // No listener on the copied button.
-    context.handlers.onLauncherClick({ target: { closest: () => copiedButton }, preventDefault() {} });
+    let stopped = false;
+    context.handlers.onLauncherClick({ target: { closest: () => copiedButton }, preventDefault() {}, stopImmediatePropagation() { stopped = true; } });
+    assert.equal(stopped, true);
   };
   click(first.node);
   click(second.node);
