@@ -232,7 +232,7 @@ async function showCatalogMatches(card, heading) {
         section.append(status);
         if (source === 'LCSH') {
           const note = document.createElement('p');
-          note.textContent = 'LCSH usa principalmente inglés; puedes buscar un término en inglés.';
+          note.textContent = 'LCSH usa principalmente inglés. Si no hay coincidencia textual exacta, se consultan etiquetas inglesas de Wikidata. Revisa su pertinencia; no son equivalencias bibliográficas confirmadas.';
           section.append(note);
         }
         for (const item of data.results) {
@@ -244,6 +244,7 @@ async function showCatalogMatches(card, heading) {
           link.textContent = item.label;
           const detail = document.createElement('p');
           detail.textContent = (item.match === 'exact' ? 'Coincidencia exacta' : 'Término relacionado; revisa su pertinencia') + (item.description ? ' · ' + item.description : '');
+          if (item.expansionSource === 'Wikidata') detail.textContent += ' · Variante inglesa de Wikidata: ' + item.expandedFrom + ' → ' + item.query;
           row.append(link, detail);
           if (kohaParentOrigin && item.canImport) {
             const button = document.createElement('button');

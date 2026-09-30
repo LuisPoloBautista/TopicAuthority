@@ -6,10 +6,11 @@ import vm from 'node:vm';
 const script = await readFile(new URL('../docs/topic-authority-koha-integration.js', import.meta.url), 'utf8');
 const heading = { main: 'Educación', subdivisions: [{ code: 'z', value: 'México' }] };
 
-async function simulate({ recordId = '15', pendingHeadings = [heading], savedHeadings = [heading], exportOk = true, apiOk = false, invalidExport = false, pending = true, pageId = '15' } = {}) {
+async function simulate({ recordId = '15', pendingHeadings = [heading], savedHeadings = [heading], exportOk = true, apiOk = false, invalidExport = false, pending = true, pageId = '15', page = 'catalogue/detail', usageOk = true } = {}) {
   const calls = [];
   const notices = [];
   let removed = false;
+  const pendingRaw = JSON.stringify({ recordId, at: Date.now(), headings: pendingHeadings });
   const fields = savedHeadings.map(h => ({
     getAttribute: () => '650',
     getElementsByTagNameNS: () => [{ code: 'a', value: h.main }, ...h.subdivisions].map(p => ({ getAttribute: () => p.code, textContent: p.value }))
@@ -18,10 +19,10 @@ async function simulate({ recordId = '15', pendingHeadings = [heading], savedHea
   const element = () => ({ setAttribute() {}, append() {} });
   vm.runInNewContext(script, {
     URLSearchParams, Date, Map, JSON, AbortSignal,
-    location: { pathname: '/cgi-bin/koha/catalogue/detail.pl', search: '?biblionumber=' + pageId, origin: 'https://koha.test' },
-    document: { readyState: 'complete', referrer: 'https://koha.test/cgi-bin/koha/cataloguing/addbiblio.pl', createElement: element, body: { prepend(node) { notices.push(node.textContent); } } },
+    location: { pathname: '/cgi-bin/koha/' + page + '.pl', search: '?biblionumber=' + pageId, origin: 'https://koha.test' },
+    document: { readyState: 'complete', getElementById: () => ({}), referrer: 'https://koha.test/cgi-bin/koha/cataloguing/addbiblio.pl', createElement: element, body: { prepend(node) { notices.push(node.textContent); } } },
     sessionStorage: {
-      getItem: () => pending ? JSON.stringify({ recordId, at: Date.now(), headings: pendingHeadings }) : null,
+      getItem: () => pending ? pendingRaw : null,
       removeItem: () => { removed = true; }
     },
     DOMParser: class { parseFromString(text) { return text === '<html />' ? { querySelector: () => null, getElementsByTagNameNS: () => [] } : xml; } },
@@ -33,7 +34,7 @@ async function simulate({ recordId = '15', pendingHeadings = [heading], savedHea
       }
       if (url.includes('/api/v1/biblios/')) return { ok: apiOk, status: apiOk ? 200 : 403, text: async () => '<record />' };
       if (url.includes('/api/headings?')) return { ok: true, json: async () => ({ headings: [] }) };
-      return { ok: true };
+      return { ok: usageOk, status: usageOk ? 200 : 403, json: async () => ({ error: 'Origen no permitido.' }) };
     }
   });
   await new Promise(resolve => setImmediate(resolve));
@@ -63,8 +64,28 @@ test('Koha falls back to authenticated MARCXML API after failed export or a logi
     assert.equal(api.options.headers.Accept, 'application/marcxml+xml');
     assert.equal(api.options.credentials, 'same-origin');
     assert.equal(result.removed, true);
-    assert.equal(result.notices.length, 0);
+    assert.match(result.notices[0], /Historial TopicAuthority actualizado/);
   }
+});
+
+test('save and continue editing confirms imported catalog terms against saved MARCXML', async () => {
+  const imported = ['Botánica', 'Botany', 'Taxonomía'].map(main => ({ main, subdivisions: [] }));
+  for (const recordId of ['15', '']) {
+    const result = await simulate({ page: 'cataloguing/addbiblio', recordId, pendingHeadings: imported, savedHeadings: imported });
+    const usage = result.calls.find(call => call.url.endsWith('/api/heading-usage'));
+    assert.deepEqual(JSON.parse(usage.options.body).headings, imported);
+    assert.equal(result.removed, true);
+    assert.match(result.notices[0], /3 encabezamiento/);
+  }
+  const unsaved = await simulate({ page: 'cataloguing/addbiblio', pendingHeadings: imported, savedHeadings: [] });
+  const usage = unsaved.calls.find(call => call.url.endsWith('/api/heading-usage'));
+  assert.deepEqual(JSON.parse(usage.options.body).headings, []);
+});
+
+test('history write failure reports the server reason and preserves pending imports', async () => {
+  const result = await simulate({ usageOk: false });
+  assert.equal(result.removed, false);
+  assert.match(result.notices[0], /HTTP 403.*Origen no permitido/);
 });
 
 test('failed verification preserves pending usage and reports the HTTP status', async () => {

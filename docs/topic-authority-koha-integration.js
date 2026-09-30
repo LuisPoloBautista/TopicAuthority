@@ -80,8 +80,10 @@
     if (!raw) return;
     const pending = JSON.parse(raw);
     if (Date.now() - pending.at > 30 * 60 * 1000) { sessionStorage.removeItem(PENDING_KEY); return; }
-    if (!/\/(?:catalogue\/(?:detail|MARCdetail)|cataloguing\/additem)\.pl$/.test(location.pathname)) return;
-    const id = new URLSearchParams(location.search).get('biblionumber');
+    // "Save and continue editing" returns to addbiblio rather than the detail page.
+    if (!/\/(?:catalogue\/(?:detail|MARCdetail)|cataloguing\/(?:additem|addbiblio))\.pl$/.test(location.pathname)) return;
+    const id = new URLSearchParams(location.search).get('biblionumber')
+      || document.querySelector('[name="biblionumber"]')?.value;
     if (!id || (pending.recordId && pending.recordId !== id)) return;
     if (!pending.recordId && !document.referrer.includes(CATALOGUING_PATH)) return;
     const xml = await readSavedMarc(id);
@@ -106,8 +108,17 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ confirmed: true, recordId: location.origin + ':' + id, headings: confirmed })
     });
-    if (!result.ok) throw new Error('El registro está guardado, pero no se pudo actualizar el historial.');
-    sessionStorage.removeItem(PENDING_KEY);
+    if (!result.ok) {
+      const detail = await result.json().catch(() => ({}));
+      throw new Error('El registro está guardado, pero no se pudo actualizar el historial (HTTP ' + result.status + '). ' + (detail.error || ''));
+    }
+    // An in-flight confirmation must not erase a subsequent save from this editor.
+    if (sessionStorage.getItem(PENDING_KEY) === raw) sessionStorage.removeItem(PENDING_KEY);
+    const message = document.createElement('div');
+    message.className = 'alert alert-success';
+    message.setAttribute('role', 'status');
+    message.textContent = 'Historial TopicAuthority actualizado: ' + new Set(confirmed.map(key)).size + ' encabezamiento(s) del registro ' + id + '.';
+    document.body.prepend(message);
   }
 
   function reportSyncFailure(error) {
