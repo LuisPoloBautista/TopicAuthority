@@ -167,6 +167,13 @@ app.get('/api/headings', async (req, res) => {
   catch { res.status(500).json({ error: 'No se pudo leer el historial de encabezamientos.' }); }
 });
 
+app.post('/api/headings', async (req, res) => {
+  const origin = req.headers.origin;
+  if (origin && !allowedOrigins.includes('*') && !allowedOrigins.includes(origin)) return res.status(403).json({ error: 'Origen no permitido.' });
+  try { res.json(await headingStore.rememberHeading(req.body?.heading)); }
+  catch (error) { res.status(error.code ? 500 : 400).json({ error: error.code ? 'No se pudo guardar el tema en el historial.' : error.message }); }
+});
+
 app.post('/api/heading-usage', async (req, res) => {
   const origin = req.headers.origin;
   if (origin && !allowedOrigins.includes('*') && !allowedOrigins.includes(origin)) return res.status(403).json({ error: 'Origen no permitido.' });

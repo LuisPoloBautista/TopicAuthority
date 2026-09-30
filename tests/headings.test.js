@@ -8,6 +8,27 @@ import { parseGeneratedHeadings, validateHeading } from '../headings.js';
 
 const heading = { main: 'Educación', subdivisions: [{ code: 'z', value: 'México' }, { code: 'v', value: 'Bibliografías' }] };
 
+test('imported topics persist immediately, deduplicate, and do not inflate confirmed usage', async t => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'topic-import-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const filename = path.join(dir, 'history.json');
+  const store = new HeadingStore(filename);
+  await Promise.all([store.rememberHeading(heading), store.rememberHeading({ ...heading, main: 'EDUCACION' })]);
+  const reopened = new HeadingStore(filename);
+  let matches = await reopened.search('Educación');
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].uses, 0);
+  assert.deepEqual(matches[0].records, []);
+  await Promise.all([reopened.saveRecord('https://koha.test:42', [heading]), reopened.rememberHeading(heading)]);
+  matches = await reopened.search('Educación');
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].uses, 1);
+  assert.equal(matches[0].records[0].biblionumber, '42');
+  await reopened.saveRecord('https://koha.test:42', []);
+  assert.equal((await reopened.search('Educación'))[0].uses, 0);
+  await assert.rejects(reopened.rememberHeading({ main: '', subdivisions: [] }));
+});
+
 test('five proposals, typed subdivisions and preservation of existing 650$a', () => {
   const raw = JSON.stringify(Array.from({ length: 5 }, () => heading));
   const result = parseGeneratedHeadings(raw, 'EDUCACIÓN');

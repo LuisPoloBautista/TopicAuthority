@@ -6,9 +6,15 @@ import vm from 'node:vm';
 test('authority metadata is optional but missing heading subfields still block before mutation', async () => {
   const source = await readFile(new URL('../docs/topic-authority-koha-integration.js', import.meta.url), 'utf8');
   const instrumented = source.replace('  function initialize() {', '  globalThis.importInto = (node, authority) => { target650Node = node; useAuthority(authority); };\n  function initialize() {');
+  const remembered = [];
   const context = vm.createContext({
+    AbortSignal,
+    fetch: async (_, options) => {
+      remembered.push(JSON.parse(options.body).heading);
+      return { ok: true, json: async () => ({ saved: true }) };
+    },
     Event: class {},
-    document: { readyState: 'loading', addEventListener() {}, getElementById: () => ({ style: {} }), body: { style: {} } }
+    document: { readyState: 'loading', addEventListener() {}, createElement: () => ({ setAttribute() {} }), getElementById: () => ({ style: {} }), body: { style: {}, prepend() {} } }
   });
   vm.runInContext(instrumented, context);
   const authority = { label: 'Botánica', uri: 'http://vocabularies.unesco.org/thesaurus/concept230', sourceCode: 'unescot', ind2: '7' };
@@ -48,6 +54,14 @@ test('authority metadata is optional but missing heading subfields still block b
   assert.equal(missingSubdivision.editors.a.value, 'previous-a');
   assert.equal(missingSubdivision.editors['0'].value, 'previous-0');
   assert.equal(missingSubdivision.editors['2'].value, 'previous-2');
+  assert.equal(remembered.length, 5); // Failed transfers never create history entries.
+  const subdivided = field(['a', 'x', 'z']);
+  context.importInto(subdivided, { subfields: [
+    { code: 'a', value: 'Educación' }, { code: 'x', value: 'Historia' }, { code: 'z', value: 'México' }
+  ] });
+  assert.deepEqual(remembered.at(-1), { main: 'Educación', subdivisions: [
+    { code: 'x', value: 'Historia' }, { code: 'z', value: 'México' }
+  ] });
 });
 
 test('a copied launcher targets its own 650 even with duplicate DOM IDs and stages the correct heading', async () => {
@@ -71,12 +85,19 @@ test('a copied launcher targets its own 650 even with duplicate DOM IDs and stag
   const first = field('Primero'), second = field('Segundo');
   const modal = { style: {} };
   let pending;
+  const remembered = [];
   const context = vm.createContext({
-    Map, WeakMap, URLSearchParams, Date, JSON,
+    Map, WeakMap, URLSearchParams, Date, JSON, AbortSignal,
+    fetch: async (url, options) => {
+      assert.equal(url, 'https://topicauthority.onrender.com/api/headings');
+      remembered.push(JSON.parse(options.body).heading);
+      return { ok: true, json: async () => ({ saved: true }) };
+    },
     Event: class {},
     location: { search: '?biblionumber=42' },
     document: {
-      readyState: 'loading', addEventListener() {}, body: { style: {} },
+      readyState: 'loading', addEventListener() {}, body: { style: {}, prepend() {} },
+      createElement: () => ({ setAttribute() {} }),
       querySelector: () => ({ value: '42' }),
       // Duplicate IDs deliberately resolve to the first field, as in the browser.
       getElementById: id => id === 'topic-authority-modal' ? modal : first.node
@@ -117,4 +138,31 @@ test('a copied launcher targets its own 650 even with duplicate DOM IDs and stag
   second.node.isConnected = false;
   context.handlers.stageSave();
   assert.equal(pending.headings.length, 0);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(remembered.map(h => h.main), ['Modelos grandes de lenguaje', 'Botánica', 'Botánica', 'Botany']);
+});
+
+test('history import failure is visible and retry saves the exact heading without recording usage', async () => {
+  const source = await readFile(new URL('../docs/topic-authority-koha-integration.js', import.meta.url), 'utf8');
+  const instrumented = source.replace('  function initialize() {', '  globalThis.remember = h => rememberImportedHeading(h).catch(error => reportSyncFailure(error, () => rememberImportedHeading(h)));\n  function initialize() {');
+  const notices = [], calls = [];
+  const element = () => ({ children: [], setAttribute() {}, append(child) { this.children.push(child); }, remove() {} });
+  const context = vm.createContext({
+    AbortSignal,
+    document: { readyState: 'loading', addEventListener() {}, createElement: element, body: { prepend(node) { notices.push(node); } } },
+    fetch: async (url, options) => {
+      calls.push({ url, body: JSON.parse(options.body) });
+      return { ok: calls.length > 1, status: calls.length > 1 ? 200 : 500, json: async () => calls.length > 1 ? { saved: true } : { error: 'Disco no disponible' } };
+    }
+  });
+  vm.runInContext(instrumented, context);
+  const heading = { main: 'Botany', subdivisions: [{ code: 'z', value: 'Mexico' }] };
+  await context.remember(heading);
+  assert.match(notices[0].textContent, /HTTP 500.*Disco no disponible/);
+  notices[0].children[0].onclick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0], calls[1]);
+  assert.deepEqual(calls[1].body.heading, heading);
+  assert.match(notices[1].textContent, /Tema guardado en el historial/);
 });

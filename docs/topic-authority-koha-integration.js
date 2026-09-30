@@ -6,7 +6,7 @@
   "use strict";
 
   const AUTHORITY_ORIGIN = "https://topicauthority.onrender.com";
-  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20260923";
+  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20260930-history";
   const CATALOGUING_PATH = "/cgi-bin/koha/cataloguing/addbiblio.pl";
   let authorityFrame = null;
   let target650Node = null;
@@ -22,7 +22,8 @@
     const main = fieldValue(node, '650', 'a');
     const subdivisions = [];
     node.querySelectorAll('.subfield_line').forEach(line => {
-      const code = line.querySelector('input[name^="tag_650_code_"]')?.name.match(/^tag_650_code_([xyzv])_/);
+      const code = line.querySelector('input[name^="tag_650_code_"]')?.name?.match(/^tag_650_code_([xyzv])_/)
+        || String(line.id || '').match(/^subfield650([xyzv])/);
       const editor = line.querySelector('.input_marceditor, input[id^=tag_], textarea[id^=tag_], select[id^=tag_]');
       if (code && editor?.value.trim()) subdivisions.push({ code: code[1], value: editor.value.trim() });
     });
@@ -121,14 +122,28 @@
     document.body.prepend(message);
   }
 
-  function reportSyncFailure(error) {
+  async function rememberImportedHeading(heading) {
+    const response = await fetch(AUTHORITY_ORIGIN + '/api/headings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ heading }), signal: AbortSignal.timeout(15000), keepalive: true
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.saved !== true) throw new Error('El tema se transfirió al 650, pero no se guardó en el historial (HTTP ' + response.status + '). ' + (result.error || 'Reintenta el guardado.'));
+    const message = document.createElement('div');
+    message.className = 'alert alert-success';
+    message.setAttribute('role', 'status');
+    message.textContent = 'Tema guardado en el historial: ' + [heading.main, ...heading.subdivisions.map(p => p.value)].join(' -- ') + '. El uso en este registro se confirmará al guardar en Koha.';
+    document.body.prepend(message);
+  }
+
+  function reportSyncFailure(error, retryAction = confirmSavedRecord) {
     const message = document.createElement('div');
     message.className = 'alert alert-warning';
     message.setAttribute('role', 'alert');
     message.textContent = 'Historial TopicAuthority: ' + error.message + ' ';
     const retry = document.createElement('button');
     retry.type = 'button'; retry.textContent = 'Reintentar sincronización';
-    retry.onclick = () => { message.remove(); confirmSavedRecord().catch(reportSyncFailure); };
+    retry.onclick = () => { message.remove(); retryAction().catch(error => reportSyncFailure(error, retryAction)); };
     message.append(retry); document.body.prepend(message);
   }
 
@@ -276,6 +291,10 @@
     // Capture what actually reached the form; usage is confirmed only after Koha saves it.
     staged.set(node, headingFromNode(node));
     closeAuthority();
+    const heading = headingFromNode(node);
+    // Remember the successfully transferred term even if MARC confirmation is unavailable.
+    // This does not count a bibliographic use or save the Koha record.
+    rememberImportedHeading(heading).catch(error => reportSyncFailure(error, () => rememberImportedHeading(heading)));
   }
 
   function initialize() {

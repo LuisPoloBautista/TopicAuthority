@@ -44,6 +44,27 @@ export class HeadingStore {
       .sort((a, b) => b.score - a.score || b.uses - a.uses).slice(0, 50)
       .map(({ score, ...heading }) => heading);
   }
+  rememberHeading(heading) {
+    let clean;
+    try { clean = validateHeading(heading); } catch (error) { return Promise.reject(error); }
+    const action = this.queue.then(async () => {
+      const data = structuredClone(await this.read());
+      const id = createHash('sha256').update(headingKey(clean)).digest('hex');
+      if (!data.entries.some(entry => entry.id === id)) {
+        data.entries.push({ ...clean, id, source: 'Local', createdAt: new Date().toISOString(), uses: 0 });
+        await this.write(data);
+      }
+      return { saved: true, id };
+    });
+    this.queue = action.catch(() => {});
+    return action;
+  }
+  async write(data) {
+    await mkdir(path.dirname(this.filename), { recursive: true });
+    await writeFile(this.filename + '.tmp', JSON.stringify(data, null, 2) + '\n', 'utf8');
+    await rename(this.filename + '.tmp', this.filename);
+    this.snapshot = null;
+  }
   saveRecord(recordId, headings) {
     if (typeof recordId !== 'string' || !recordId.trim() || recordId.length > 300 || !Array.isArray(headings) || headings.length > 100) {
       return Promise.reject(new Error('Se requiere un identificador de registro y hasta 100 encabezamientos.'));
@@ -77,10 +98,7 @@ export class HeadingStore {
       const counts = new Map();
       for (const list of Object.values(data.records)) for (const id of list) counts.set(id, (counts.get(id) || 0) + 1);
       for (const entry of data.entries) entry.uses = counts.get(entry.id) || 0;
-      await mkdir(path.dirname(this.filename), { recursive: true });
-      await writeFile(this.filename + '.tmp', JSON.stringify(data, null, 2) + '\n', 'utf8');
-      await rename(this.filename + '.tmp', this.filename);
-      this.snapshot = null;
+      await this.write(data);
       return { saved: true, headings: [...new Set(ids)].length };
     });
     this.queue = action.catch(() => {});

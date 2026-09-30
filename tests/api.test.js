@@ -58,6 +58,17 @@ test('API generates typed headings and counts confirmed records only', async t =
   assert.equal((await pdf.json()).headings.length, 5);
   assert.doesNotMatch(prompt, /Conserva literalmente/);
   assert.deepEqual((await (await fetch(url + '/api/headings?q=educacion')).json()).headings, []);
+  for (const heading of [h, { main: 'Botany', subdivisions: [] }]) {
+    for (let i = 0; i < 2; i++) {
+      const saved = await post('/api/headings', { heading });
+      assert.equal(saved.status, 200);
+      assert.equal((await saved.json()).saved, true);
+    }
+    const matches = (await (await fetch(url + '/api/headings?q=' + encodeURIComponent(heading.main))).json()).headings;
+    assert.equal(matches.length, 1);
+    assert.equal(matches[0].uses, 0);
+  }
+  assert.equal((await post('/api/headings', { heading: { main: '', subdivisions: [] } })).status, 400);
   assert.equal((await post('/api/heading-usage', { recordId: 'koha:1', headings: [h] })).status, 400);
   for (let i = 0; i < 2; i++) assert.equal((await post('/api/heading-usage', { confirmed: true, recordId: 'koha:1', headings: [h] })).status, 200);
   assert.equal((await (await fetch(url + '/api/headings?q=educacion')).json()).headings[0].uses, 1);

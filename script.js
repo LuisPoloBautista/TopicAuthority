@@ -160,7 +160,7 @@ async function showLocalMatches(card, heading, automatic = false) {
       caption.textContent = 'Encabezamientos recuperados del historial';
       const thead = document.createElement('thead');
       const header = document.createElement('tr');
-      for (const title of ['Encabezamiento usado', 'Coincidencia', 'Registros', 'Biblionumber', 'Acción']) {
+      for (const title of ['Encabezamiento guardado', 'Coincidencia', 'Registros confirmados', 'Biblionumber', 'Acción']) {
         const cell = document.createElement('th');
         cell.scope = 'col'; cell.textContent = title; header.append(cell);
       }
@@ -185,7 +185,7 @@ async function showLocalMatches(card, heading, automatic = false) {
             records.append(link);
           } catch { /* Invalid record references are not rendered as links. */ }
         }
-        if (!records.children.length) records.textContent = match.uses ? 'No disponible para usos anteriores' : 'Sin registros actuales';
+        if (!records.children.length) records.textContent = match.uses ? 'No disponible para usos anteriores' : 'Tema guardado; sin usos confirmados actuales';
         else if ((match.records || []).length < match.uses) {
           const note = document.createElement('span'); note.textContent = 'Hay usos anteriores sin identificador.'; records.append(note);
         }
