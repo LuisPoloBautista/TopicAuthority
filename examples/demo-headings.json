@@ -1,0 +1,14 @@
+[
+  { "main": "Ciencias de la computación", "subdivisions": [] },
+  { "main": "Ciencias de la computación", "subdivisions": [{ "code": "x", "value": "Enseñanza" }] },
+  { "main": "Aprendizaje automático", "subdivisions": [] },
+  { "main": "Aprendizaje profundo", "subdivisions": [] },
+  { "main": "Inteligencia artificial", "subdivisions": [] },
+  { "main": "Modelos grandes de lenguaje", "subdivisions": [] },
+  { "main": "Química", "subdivisions": [] },
+  { "main": "Química orgánica", "subdivisions": [] },
+  { "main": "Física cuántica", "subdivisions": [] },
+  { "main": "Botánica", "subdivisions": [] },
+  { "main": "Botánica", "subdivisions": [{ "code": "z", "value": "México" }] },
+  { "main": "Botánica sistemática", "subdivisions": [] }
+]

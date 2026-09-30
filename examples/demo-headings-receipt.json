@@ -1,0 +1,104 @@
+{
+  "origin": "https://topicauthority.onrender.com",
+  "purpose": "Temporary demonstration headings; no bibliographic records",
+  "entries": [
+    {
+      "id": "32590be0cd654bea74c0828f5267af8843831e57ae50590725b61ecabe706821",
+      "heading": {
+        "main": "Ciencias de la computación",
+        "subdivisions": []
+      },
+      "insertedAt": "2026-09-30T18:49:55.618Z"
+    },
+    {
+      "id": "7e104e2f544b98a97cf63554af2c12200573a6643cd2009083c18302a2d83cd2",
+      "heading": {
+        "main": "Ciencias de la computación",
+        "subdivisions": [
+          {
+            "code": "x",
+            "value": "Enseñanza"
+          }
+        ]
+      },
+      "insertedAt": "2026-09-30T18:49:56.270Z"
+    },
+    {
+      "id": "be6a436bba6962c16facf17ff0d433bf9e7b8946140e10966efc93d7d9535725",
+      "heading": {
+        "main": "Aprendizaje automático",
+        "subdivisions": []
+      },
+      "insertedAt": "2026-09-30T18:49:57.268Z"
+    },
+    {
+      "id": "b5383ec574ac128e9db0a2436186ef2ed44cae64be6aac26aa474ac3cb868ae9",
+      "heading": {
+        "main": "Aprendizaje profundo",
+        "subdivisions": []
+      },
+      "insertedAt": "2026-09-30T18:49:57.856Z"
+    },
+    {
+      "id": "1e1734cd626859a09459f19c7f8e33bf1baf857d06c9c85229ff8b5e18fac4ac",
+      "heading": {
+        "main": "Inteligencia artificial",
+        "subdivisions": []
+      },
+      "insertedAt": "2026-09-30T18:49:58.810Z"
+    },
+    {
+      "id": "4178433d443f90e8f4959f21986b3e30d9734685ab317e477d92e0868a6f71eb",
+      "heading": {
+        "main": "Modelos grandes de lenguaje",
+        "subdivisions": []
+      },
+      "insertedAt": "2026-09-30T18:49:59.377Z"
+    },
+    {
+      "id": "d18eb7bb21adb1e1eead950eefbc626897f22c738a7ff5f3b0365e1207b90d02",
+      "heading": {
+        "main": "Química",
+        "subdivisions": []
+      },
+      "insertedAt": "2026-09-30T18:49:59.931Z"
+    },
+    {
+      "id": "e48b259c279bd2794012787fc4f0881e08d9a6bb672865478f8e01c28c32d4bd",
+      "heading": {
+        "main": "Química orgánica",
+        "subdivisions": []
+      },
+      "insertedAt": "2026-09-30T18:50:01.080Z"
+    },
+    {
+      "id": "43b7c691d10832185ab762d5238a0f530c60ac1bfcfcc8eec131953299a1f6bd",
+      "heading": {
+        "main": "Botánica",
+        "subdivisions": []
+      },
+      "insertedAt": "2026-09-30T18:50:01.855Z"
+    },
+    {
+      "id": "8b787465950c239aa302cb7642f172b4a01973e688dce871d90225b3c81e0eac",
+      "heading": {
+        "main": "Botánica",
+        "subdivisions": [
+          {
+            "code": "z",
+            "value": "México"
+          }
+        ]
+      },
+      "insertedAt": "2026-09-30T18:50:02.234Z"
+    },
+    {
+      "id": "106aabd7cd1ac76889d807d753ea84946c2975e01215ed84e28f172b949d6455",
+      "heading": {
+        "main": "Botánica sistemática",
+        "subdivisions": []
+      },
+      "insertedAt": "2026-09-30T18:50:03.234Z"
+    }
+  ]
+}
