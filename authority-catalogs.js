@@ -2,6 +2,18 @@
 const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 export const catalogSources = ['UNESCO', 'Wikidata', 'LCSH'];
 
+function relevance(query, label) {
+  const q = normalize(query).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const candidate = normalize(label).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!q || !candidate) return 0;
+  if (q === candidate) return 1;
+  if (candidate.startsWith(q + ' ') || q.startsWith(candidate + ' ')) return 0.9;
+  const queryWords = new Set(q.split(' ').filter(word => word.length > 2));
+  const candidateWords = new Set(candidate.split(' ').filter(word => word.length > 2));
+  const shared = [...queryWords].filter(word => candidateWords.has(word)).length;
+  return shared ? shared / Math.max(queryWords.size, candidateWords.size) : 0;
+}
+
 export function searchVariants(term) {
   const main = term.split(/\s*--\s*/)[0].trim();
   const words = main.split(/\s+/).filter(word => word.length > 2 && !/^(de|del|las|los|para|con)$/i.test(word));
@@ -32,11 +44,11 @@ async function englishVariants(term, fetcher, signal) {
   ))].slice(0, 3);
 }
 
-async function lookup(source, term, fetcher, signal) {
+async function lookup(source, term, fetcher, signal, language = 'es') {
   let url;
   if (source === 'UNESCO') {
     url = new URL('https://vocabularies.unesco.org/rest/v1/search');
-    url.search = new URLSearchParams({ vocab: 'unesco', query: term + '*', lang: 'es', maxhits: '5' });
+    url.search = new URLSearchParams({ vocab: 'unesco', query: term + '*', lang: language, maxhits: '10' });
   } else if (source === 'Wikidata') {
     url = new URL('https://www.wikidata.org/w/api.php');
     url.search = new URLSearchParams({ action: 'wbsearchentities', search: term, language: 'es', uselang: 'es', format: 'json', limit: '5', type: 'item' });
@@ -63,10 +75,12 @@ async function lookup(source, term, fetcher, signal) {
       const uri = new URL(row.uri);
       if (!['http:', 'https:'].includes(uri.protocol) || uri.hostname !== hosts[source] || typeof row.label !== 'string' || !row.label.trim()) continue;
       // Compound LCSH labels cannot safely be inferred as a single MARC $a.
-      unique.set(row.uri, { ...row, source, canImport: !row.label.includes('--') });
+      const score = relevance(term, row.label);
+      if (score < 0.34) continue;
+      unique.set(row.uri, { ...row, source, relevance: Math.round(score * 100), canImport: !row.label.includes('--') });
     } catch { /* Discard malformed identifiers from upstream. */ }
   }
-  return [...unique.values()].slice(0, 5);
+  return [...unique.values()].sort((a, b) => b.relevance - a.relevance || a.label.localeCompare(b.label)).slice(0, 5);
 }
 
 export function createCatalogSearch({ fetcher = fetch, timeoutMs = 4500, lcshTimeoutMs = timeoutMs * 2, ttlMs = 600000 } = {}) {
@@ -85,7 +99,7 @@ export function createCatalogSearch({ fetcher = fetch, timeoutMs = 4500, lcshTim
       const attempt = async (query, expandedFrom) => {
         if (queries.some(previous => normalize(previous) === normalize(query))) return null;
         queries.push(query);
-        const results = await lookup(source, query, fetcher, signal);
+        const results = await lookup(source, query, fetcher, signal, expandedFrom ? 'en' : 'es');
         if (!results.length) return null;
         return { source, queries, results: results.map(row => ({ ...row, query,
           ...(expandedFrom ? { expandedFrom, expansionSource: 'Wikidata' } : {}),
@@ -95,7 +109,7 @@ export function createCatalogSearch({ fetcher = fetch, timeoutMs = 4500, lcshTim
       for (const query of searchVariants(term)) {
         const direct = await attempt(query);
         if (direct && (source !== 'LCSH' || direct.results.some(row => normalize(row.label) === normalize(query)))) return direct;
-        if (source === 'LCSH') {
+        if (source === 'LCSH' || source === 'UNESCO') {
           for (const english of await englishVariants(query, fetcher, signal)) {
             const expanded = await attempt(english, query);
             if (expanded) return expanded;

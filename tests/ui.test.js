@@ -47,9 +47,6 @@ test('UI offers subdivision generation for an existing 650$a and heading generat
   assert.equal((nodes.get('marcOutput').innerHTML.match(/class="topic-card"/g) || []).length, 1);
   assert.match(nodes.get('marcOutput').innerHTML, /catalog-results/);
   assert.match(nodes.get('output').innerHTML, /Educación/);
-  await context.analyzeText('Texto PDF', '', 'pdf', nodes.get('pdfOutput'));
-  assert.equal((nodes.get('pdfOutput').innerHTML.match(/class="topic-card"/g) || []).length, 5);
-  assert.equal((nodes.get('marcOutput').innerHTML.match(/class="topic-card"/g) || []).length, 1);
   context.receiveKohaContext({ existingMain: '', existingTerm: '', marcText: '=245 $a Historia' }, 'https://koha.test');
   assert.match(nodes.get('analyzeKohaBtn').textContent, /un encabezamiento/);
   assert.equal(nodes.get('authorityTermInput').value, '');

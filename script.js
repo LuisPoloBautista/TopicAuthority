@@ -1,11 +1,7 @@
 import { headingLabel } from "./headings.js";
-const pdfInput = document.getElementById("pdfInput");
-const processPdfBtn = document.getElementById("processPdfBtn");
 const output = document.getElementById("output");
 const marcOutput = document.getElementById("marcOutput");
-const pdfOutput = document.getElementById("pdfOutput");
 const requestsByOutput = new WeakMap();
-const dropZone = document.getElementById("dropZone");
 const sidebar = document.getElementById("infoSidebar");
 const sidebarToggle = document.getElementById("sidebarToggle");
 const kohaContextMessage = document.getElementById("kohaContextMessage");
@@ -26,35 +22,6 @@ if (sidebarToggle && sidebar) {
   });
 }
 
-dropZone.addEventListener("click", () => {
-  pdfInput.click();
-});
-
-dropZone.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  dropZone.classList.add("dragover");
-});
-
-dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
-
-dropZone.addEventListener("drop", (e) => {
-  e.preventDefault();
-  dropZone.classList.remove("dragover");
-  const files = e.dataTransfer.files;
-  if (files.length && files[0].type === "application/pdf") {
-    pdfInput.files = files;
-    dropZone.querySelector("p").textContent = `PDF seleccionado: ${files[0].name}`;
-  } else {
-    alert("Por favor, suelta solo archivos PDF.");
-  }
-});
-
-pdfInput.addEventListener("change", () => {
-  if (pdfInput.files.length) {
-    dropZone.querySelector("p").textContent = `PDF seleccionado: ${pdfInput.files[0].name}`;
-  }
-});
-
 function escapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -64,28 +31,7 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-async function extractTextFromPdf(file) {
-  const pdfLib = window["pdfjsLib"];
-  if (!pdfLib) {
-    throw new Error("pdf.js no está disponible. Recarga la página o verifica la conexión a internet.");
-  }
-  pdfLib.GlobalWorkerOptions.workerSrc =
-    "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfLib.getDocument({ data: arrayBuffer }).promise;
-  let fullText = "";
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items.map((item) => item.str).join(" ");
-    fullText += pageText + "\n\n";
-  }
-
-  return fullText.trim();
-}
-
-async function requestTopics(text, existingMain = "", mode = "pdf") {
+async function requestTopics(text, existingMain = "", mode = "marc") {
   const res = await fetch("/api/topics", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -230,9 +176,9 @@ async function showCatalogMatches(card, heading) {
         section.replaceChildren(title);
         status.textContent = data.results.length ? 'Consulta: ' + data.queries.join(' → ') : 'Sin coincidencias. Consulta: ' + data.queries.join(' → ');
         section.append(status);
-        if (source === 'LCSH') {
+        if (source === 'LCSH' || data.results.some(item => item.expansionSource === 'Wikidata')) {
           const note = document.createElement('p');
-          note.textContent = 'LCSH usa principalmente inglés. Si no hay coincidencia textual exacta, se consultan etiquetas inglesas de Wikidata. Revisa su pertinencia; no son equivalencias bibliográficas confirmadas.';
+          note.textContent = source + ' también se consulta con la etiqueta inglesa verificada en Wikidata. Se muestran primero las coincidencias léxicas más cercanas; revisa su pertinencia bibliográfica.';
           section.append(note);
         }
         for (const item of data.results) {
@@ -243,7 +189,7 @@ async function showCatalogMatches(card, heading) {
           link.href = uri.href; link.target = '_blank'; link.rel = 'noopener noreferrer';
           link.textContent = item.label;
           const detail = document.createElement('p');
-          detail.textContent = (item.match === 'exact' ? 'Coincidencia exacta' : 'Término relacionado; revisa su pertinencia') + (item.description ? ' · ' + item.description : '');
+          detail.textContent = (item.match === 'exact' ? 'Coincidencia exacta' : `Término relacionado (${item.relevance || 0}%); revisa su pertinencia`) + (item.description ? ' · ' + item.description : '');
           if (item.expansionSource === 'Wikidata') detail.textContent += ' · Variante inglesa de Wikidata: ' + item.expandedFrom + ' → ' + item.query;
           row.append(link, detail);
           if (kohaParentOrigin && item.canImport) {
@@ -364,8 +310,7 @@ function receiveKohaContext(context, origin) {
   updateCatalogLinks();
   output.textContent = 'Busca este encabezamiento o uno similar en el historial JSON.';
   marcOutput.textContent = 'Aquí aparecerá un solo encabezamiento con hasta dos subdivisiones.';
-  pdfOutput.textContent = 'Aquí aparecerán las cinco propuestas del PDF.';
-  kohaContextMessage.textContent = existing ? `650$a: ${existing}. Se conserva el encabezamiento principal y se sugieren hasta dos subdivisiones en total, no cinco alternativas.` : '650$a vacío: se propondrá un solo encabezamiento con hasta dos subdivisiones. Las cinco propuestas se generan únicamente desde un PDF.';
+  kohaContextMessage.textContent = existing ? `650$a: ${existing}. Se conserva el encabezamiento principal y se sugieren hasta dos subdivisiones.` : '650$a vacío: se propondrá un solo encabezamiento con hasta dos subdivisiones.';
   if (existing) searchOneTopic(authorityTermInput.value.trim());
 }
 
@@ -374,7 +319,7 @@ function updateCatalogLinks() {
 }
 authorityTermInput.addEventListener('input', updateCatalogLinks);
 
-async function analyzeText(sourceText, existingMain = "", mode = "pdf", output = pdfOutput) {
+async function analyzeText(sourceText, existingMain = "", mode = "marc", output = marcOutput) {
   if (!sourceText) {
     output.textContent = "No hay texto para analizar.";
     return;
@@ -383,7 +328,7 @@ async function analyzeText(sourceText, existingMain = "", mode = "pdf", output =
   const version = viewVersion;
   const request = (requestsByOutput.get(output) || 0) + 1;
   requestsByOutput.set(output, request);
-  output.textContent = mode === 'pdf' ? 'Generando cinco temas desde el PDF...' : 'Preparando un encabezamiento con hasta dos subdivisiones desde MARC...';
+  output.textContent = 'Preparando un encabezamiento con hasta dos subdivisiones desde MARC...';
 
   try {
     const data = await requestTopics(sourceText, existingMain, mode);
@@ -400,34 +345,6 @@ async function analyzeText(sourceText, existingMain = "", mode = "pdf", output =
     if (version === viewVersion && requestsByOutput.get(output) === request) output.textContent = `Error: ${error.message}`;
   }
 }
-
-processPdfBtn.addEventListener("click", async () => {
-  const output = pdfOutput;
-  const file = pdfInput.files?.[0];
-  if (!file) {
-    output.textContent = "Selecciona un archivo PDF primero.";
-    alert("Selecciona un PDF primero.");
-    return;
-  }
-
-  output.textContent = "Extrayendo texto del PDF...";
-  const version = viewVersion;
-  processPdfBtn.disabled = true;
-
-  try {
-    const pdfText = await extractTextFromPdf(file);
-    if (version !== viewVersion) return;
-    if (!pdfText) {
-      output.textContent = "El PDF no contiene texto legible.";
-      return;
-    }
-    await analyzeText(pdfText, '', 'pdf', pdfOutput);
-  } catch (error) {
-    if (version === viewVersion) output.textContent = `Error leyendo PDF: ${error.message}`;
-  } finally {
-    processPdfBtn.disabled = false;
-  }
-});
 
 analyzeKohaBtn?.addEventListener("click", async () => {
   analyzeKohaBtn.disabled = true;

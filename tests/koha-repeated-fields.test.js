@@ -62,6 +62,34 @@ test('authority metadata is optional but missing heading subfields still block b
   assert.deepEqual(remembered.at(-1), { main: 'Educación', subdivisions: [
     { code: 'x', value: 'Historia' }, { code: 'z', value: 'México' }
   ] });
+
+  const repeatedEditors = [];
+  const repeatedLines = [];
+  const addLine = (code, value = '') => {
+    const editor = { value, dispatchEvent() {} };
+    repeatedEditors.push(editor);
+    const line = {
+      id: 'subfield650' + code + repeatedLines.length,
+      querySelector(selector) {
+        if (selector.startsWith('input[name')) return selector.includes('_code_' + code + '_') ? { closest: () => line } : null;
+        if (selector.includes('buttonPlus')) return code === 'x' ? { click: () => addLine('x') } : null;
+        return editor;
+      }
+    };
+    repeatedLines.push(line);
+  };
+  addLine('a'); addLine('x');
+  const repeatable = {
+    isConnected: true,
+    querySelector: selector => repeatedLines.map(line => line.querySelector(selector)).find(Boolean),
+    querySelectorAll: selector => selector === '.subfield_line' ? repeatedLines : []
+  };
+  context.importInto(repeatable, { subfields: [
+    { code: 'a', value: 'Educación' }, { code: 'x', value: 'Historia' }, { code: 'x', value: 'Estudio y enseñanza' }
+  ] });
+  assert.deepEqual(remembered.at(-1), { main: 'Educación', subdivisions: [
+    { code: 'x', value: 'Historia' }, { code: 'x', value: 'Estudio y enseñanza' }
+  ] });
 });
 
 test('a copied launcher targets its own 650 even with duplicate DOM IDs and stages the correct heading', async () => {

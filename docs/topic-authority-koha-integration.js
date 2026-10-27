@@ -6,7 +6,7 @@
   "use strict";
 
   const AUTHORITY_ORIGIN = "https://topicauthority.onrender.com";
-  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20260930-history";
+  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20261027-mapping";
   const CATALOGUING_PATH = "/cgi-bin/koha/cataloguing/addbiblio.pl";
   let authorityFrame = null;
   let target650Node = null;
@@ -246,7 +246,7 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "btn btn-sm btn-primary topic-authority-launcher";
-      button.innerHTML = '<i class="fa fa-lightbulb" aria-hidden="true"></i> Sugerencia de autoridad';
+      button.innerHTML = '<i class="fa fa-random" aria-hidden="true"></i> Mapeo terminológico';
       const controls = node.querySelector(".field_controls");
       (controls || node.querySelector(".tag_title") || node).appendChild(button);
     });
@@ -261,11 +261,21 @@
     const destinations = [];
     const used = new Map();
     for (const part of desired) {
-      const editors = [...node.querySelectorAll('.subfield_line')].filter(line =>
+      const offset = used.get(part.code) || 0;
+      let editors = [...node.querySelectorAll('.subfield_line')].filter(line =>
         line.querySelector('input[name^="tag_650_code_' + part.code + '_"]') || line.id.startsWith('subfield650' + part.code)
       ).map(line => line.querySelector('.input_marceditor, input[id^=tag_], textarea[id^=tag_], select[id^=tag_]')).filter(Boolean);
-      const offset = used.get(part.code) || 0;
-      if (!editors[offset] && part.value && !['0', '2'].includes(part.code)) throw new Error('Agrega al framework la ocurrencia ' + (offset + 1) + ' de 650$' + part.code + ' y vuelve a importar.');
+      if (!editors[offset] && part.value && !['0', '2'].includes(part.code)) {
+        const template = [...node.querySelectorAll('.subfield_line')].find(line =>
+          line.querySelector('input[name^="tag_650_code_' + part.code + '_"]') || line.id.startsWith('subfield650' + part.code)
+        );
+        const add = template?.querySelector('.buttonPlus, .clone-subfield, [onclick*="CloneSubfield"], [data-action="clone-subfield"]');
+        if (typeof add?.click === 'function') add.click();
+        editors = [...node.querySelectorAll('.subfield_line')].filter(line =>
+          line.querySelector('input[name^="tag_650_code_' + part.code + '_"]') || line.id.startsWith('subfield650' + part.code)
+        ).map(line => line.querySelector('.input_marceditor, input[id^=tag_], textarea[id^=tag_], select[id^=tag_]')).filter(Boolean);
+      }
+      if (!editors[offset] && part.value && !['0', '2'].includes(part.code)) throw new Error('Koha no pudo crear otra ocurrencia de 650$' + part.code + '. Comprueba que el subcampo sea repetible en el framework.');
       used.set(part.code, offset + 1);
       if (editors[offset]) destinations.push([editors[offset], part.value]);
     }
@@ -309,7 +319,7 @@
     }
     const style = document.createElement("style");
     style.textContent = [
-      ".topic-authority-launcher{margin-left:10px!important;padding:4px 9px!important;font-size:12px!important}",
+      ".topic-authority-launcher{margin-left:8px!important;padding:3px 8px!important;font-size:11px!important;background:#f6f7f8!important;border:1px solid #c9ced3!important;color:#334155!important}",
       "#topic-authority-modal{display:none;position:fixed;inset:0;z-index:2100;background:#0008;align-items:center;justify-content:center;padding:24px}",
       "#topic-authority-dialog{width:min(1200px,96vw);height:92vh;background:#fff;border-radius:8px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px #0007}",
       "#topic-authority-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#b94720;color:#fff}",
@@ -323,8 +333,8 @@
 
     const modal = document.createElement("div");
     modal.id = "topic-authority-modal";
-    modal.innerHTML = '<div id="topic-authority-dialog" role="dialog" aria-modal="true" aria-label="Sugerencias de autoridad">' +
-      '<div id="topic-authority-header"><strong>Sugerencias de autoridad para 650</strong>' +
+    modal.innerHTML = '<div id="topic-authority-dialog" role="dialog" aria-modal="true" aria-label="Mapeo terminológico">' +
+      '<div id="topic-authority-header"><strong>Mapeo terminológico para 650</strong>' +
       '<div><button id="topic-authority-expand" type="button" aria-expanded="false">Ampliar ventana</button><button id="topic-authority-close" type="button" aria-label="Cerrar">&times;</button></div></div>' +
       '<iframe id="topic-authority-frame" title="TopicAuthority"></iframe></div>';
     document.body.appendChild(modal);

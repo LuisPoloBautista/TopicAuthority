@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Asistente de autoridades de materia MARC21</title>
   <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -19,20 +18,19 @@
     <main class="container">
       <header class="hero">
         <h1>Autoridades de materia MARC21</h1>
-        <p>Reutiliza encabezamientos del historial y prepara la etiqueta 650 de Koha.</p>
+        <p>Consulta, compara y transfiere encabezamientos a la etiqueta 650 de Koha.</p>
       </header>
 
-      <p class="intro">Busca encabezamientos iguales o similares en tu historial. Usa el espacio MARC para un encabezamiento con hasta dos subdivisiones, o el espacio PDF para cinco propuestas temáticas.</p>
+      <p class="intro">Busca autoridades locales y externas, o genera un encabezamiento con hasta dos subdivisiones a partir del registro MARC.</p>
 
       <div class="block authority-query" id="authorityQueryBlock">
-        <h2>Historial y catálogos de autoridades</h2>
+        <h2>Mapeo de autoridades</h2>
         <label for="authorityTermInput">Tema o encabezamiento 650</label>
         <input id="authorityTermInput" type="text" placeholder="Ejemplo: Inteligencia artificial -- Aspectos éticos" autocomplete="off" />
         <div class="koha-actions">
-          <button id="searchAuthorityBtn" type="button">Buscar en historial y catálogos</button>
+          <button id="searchAuthorityBtn" type="button">Buscar autoridades</button>
         </div>
         <div id="catalogLinks" class="catalog-links"></div>
-        <p class="query-help">.</p>
         <div id="output" aria-live="polite">Escribe un encabezamiento para comprobar si ya se ha usado.</div>
       </div>
 
@@ -43,18 +41,6 @@
         <div id="marcOutput" class="generation-output" aria-live="polite">Aquí aparecerá un solo encabezamiento con sus subdivisiones.</div>
       </section>
 
-      <div class="block">
-        <h2>Propuestas temáticas desde un PDF</h2>
-        <p>Genera cinco encabezamientos diferentes a partir del documento, con hasta dos subdivisiones por tema. Esta generación es independiente del 650$a seleccionado en Koha.</p>
-        <div id="dropZone" class="drop-zone">
-          <p>Arrastra y suelta un PDF aquí o haz clic para seleccionar</p>
-          <input type="file" id="pdfInput" accept="application/pdf" style="display: none;" />
-        </div>
-        <br/>
-        <button id="processPdfBtn">Generar 5 temas desde el PDF</button>
-        <div id="pdfOutput" class="generation-output" aria-live="polite">Aquí aparecerán las cinco propuestas del PDF.</div>
-      </div>
-
     </main>
 
     <aside class="info-sidebar" id="infoSidebar">
@@ -62,9 +48,8 @@
       <div class="sidebar-content">
         <h2>Cómo usar la herramienta</h2>
         <ul>
-          <li><strong>Historial:</strong> muestra encabezamientos usados, coincidencias similares y número de registros. Importa la forma existente para normalizar su uso.</li>
+          <li><strong>Mapeo:</strong> muestra encabezamientos usados, coincidencias similares y número de registros. Importa la forma existente para normalizar su uso.</li>
           <li><strong>MARC:</strong> un solo encabezamiento con hasta dos subdivisiones: materia ($x), cronología ($y), geografía ($z) o forma ($v).</li>
-          <li><strong>PDF:</strong> cinco propuestas temáticas en un espacio independiente.</li>
           <li><strong>Catálogos:</strong> UNESCO, Wikidata y LCSH se consultan automáticamente para cada tema. Revisa los resultados y usa el término que corresponda al 650 seleccionado.</li>
           <li><strong>Uso:</strong> transferir un encabezamiento no guarda el registro. El contador se actualiza al verificar el guardado en Koha.</li>
         </ul>

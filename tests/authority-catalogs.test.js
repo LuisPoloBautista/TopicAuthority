@@ -101,6 +101,7 @@ test('broadens a missing phrase, shares pending requests, caches results and nev
   const calls = [];
   const search = createCatalogSearch({ fetcher: async url => {
     calls.push(url);
+    if (url.hostname === 'www.wikidata.org') return { ok: true, json: async () => ({ search: [] }) };
     assert.equal(url.hostname, 'vocabularies.unesco.org');
     const results = url.searchParams.get('query') === 'Botánica*'
       ? [{ prefLabel: 'Botánica', uri: 'http://vocabularies.unesco.org/thesaurus/concept1' }] : [];
@@ -112,8 +113,28 @@ test('broadens a missing phrase, shares pending requests, caches results and nev
   assert.equal(a.results[0].match, 'related');
   assert.equal(a.results[0].canImport, true);
   await search('UNESCO', 'Botánica sistemática');
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.deepEqual(searchVariants('Botánica sistemática -- México'), ['Botánica sistemática', 'Botánica']);
+});
+
+test('UNESCO retries a verified English mapping and ranks close labels first', async () => {
+  const search = createCatalogSearch({ fetcher: async url => {
+    if (url.hostname === 'www.wikidata.org') {
+      return { ok: true, json: async () => ({ search: [englishCandidate('Inteligencia artificial', 'artificial intelligence')] }) };
+    }
+    const query = url.searchParams.get('query');
+    assert.equal(url.searchParams.get('lang'), query === 'artificial intelligence*' ? 'en' : 'es');
+    return { ok: true, json: async () => ({ results: query === 'artificial intelligence*' ? [
+      { prefLabel: 'Artificial intelligence', uri: 'http://vocabularies.unesco.org/thesaurus/concept1' },
+      { prefLabel: 'Artificial intelligence in education', uri: 'http://vocabularies.unesco.org/thesaurus/concept2' },
+      { prefLabel: 'Unrelated record', uri: 'http://vocabularies.unesco.org/thesaurus/concept3' }
+    ] : [] }) };
+  } });
+  const result = await search('UNESCO', 'Inteligencia artificial');
+  assert.deepEqual(result.queries, ['Inteligencia artificial', 'artificial intelligence']);
+  assert.deepEqual(result.results.map(row => row.label), ['Artificial intelligence', 'Artificial intelligence in education']);
+  assert.equal(result.results[0].relevance, 100);
+  assert.equal(result.results[0].expansionSource, 'Wikidata');
 });
 
 test('parses Wikidata and LCSH, rejects unsafe URIs and prevents flattening compound LCSH into $a', async () => {
