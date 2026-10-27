@@ -21,7 +21,7 @@
         <p>Consulta, compara y transfiere encabezamientos a la etiqueta 650 de Koha.</p>
       </header>
 
-      <p class="intro">Busca autoridades locales y externas, o genera un encabezamiento con hasta dos subdivisiones a partir del registro MARC.</p>
+      <p class="intro">Busca autoridades locales y externas, o genera tres encabezamientos de materia a partir de los metadatos MARC del registro.</p>
 
       <div class="block authority-query" id="authorityQueryBlock">
         <h2>Mapeo de autoridades</h2>
@@ -35,10 +35,10 @@
       </div>
 
       <section class="block generation-panel" aria-labelledby="marcTitle">
-        <h2 id="marcTitle">Subdivisiones desde los campos MARC</h2>
-        <p id="kohaContextMessage" class="query-help">Abre la herramienta desde Koha para usar el contexto MARC. Si 650$a ya tiene texto, se conserva y se sugieren hasta dos subdivisiones en total. Si está vacío, se propone un solo encabezamiento.</p>
-        <button id="analyzeKohaBtn" type="button" hidden>Sugerir hasta 2 subdivisiones</button>
-        <div id="marcOutput" class="generation-output" aria-live="polite">Aquí aparecerá un solo encabezamiento con sus subdivisiones.</div>
+        <h2 id="marcTitle">Encabezamientos desde los campos MARC</h2>
+        <p id="kohaContextMessage" class="query-help">Abre la herramienta desde Koha para analizar los metadatos anteriores del registro y proponer tres encabezamientos de materia.</p>
+        <button id="analyzeKohaBtn" type="button" hidden>Generar 3 encabezamientos de materia</button>
+        <div id="marcOutput" class="generation-output" aria-live="polite">Aquí aparecerán tres encabezamientos de materia sugeridos.</div>
       </section>
 
     </main>
@@ -49,7 +49,7 @@
         <h2>Cómo usar la herramienta</h2>
         <ul>
           <li><strong>Mapeo:</strong> muestra encabezamientos usados, coincidencias similares y número de registros. Importa la forma existente para normalizar su uso.</li>
-          <li><strong>MARC:</strong> un solo encabezamiento con hasta dos subdivisiones: materia ($x), cronología ($y), geografía ($z) o forma ($v).</li>
+          <li><strong>MARC:</strong> tres encabezamientos de materia basados en los metadatos anteriores del registro; cada uno puede incluir hasta dos subdivisiones.</li>
           <li><strong>Catálogos:</strong> UNESCO, Wikidata y LCSH se consultan automáticamente para cada tema. Revisa los resultados y usa el término que corresponda al 650 seleccionado.</li>
           <li><strong>Uso:</strong> transferir un encabezamiento no guarda el registro. El contador se actualiza al verificar el guardado en Koha.</li>
         </ul>

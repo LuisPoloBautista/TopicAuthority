@@ -1,12 +1,13 @@
 # topicIA
 
-Asistente de indización para Koha: genera un encabezamiento con hasta dos subdivisiones desde MARC, mapea encabezamientos usados anteriormente y permite revisar autoridades externas.
+Asistente de indización para Koha: genera tres encabezamientos de materia a partir de los metadatos MARC, mapea encabezamientos usados anteriormente y permite revisar autoridades externas.
 
 ## Flujo
 
 ```text
-Espacio MARC: 650$a con información -> conservarlo + hasta 2 subdivisiones en total
-Espacio MARC: 650$a vacío -> 1 encabezamiento + hasta 2 subdivisiones
+Espacio MARC: analizar los metadatos anteriores -> 3 encabezamientos de materia distintos
+  -> el 650$a actual sirve como contexto, pero no se conserva obligatoriamente
+  -> cada propuesta admite hasta 2 subdivisiones
   -> comprobar historial local, advertir coincidencias e importar una forma usada
   -> consultar automáticamente UNESCO, Wikidata y LCSH, sin tokens de IA
   -> transferir a Koha -> guardar registro -> verificar MARCXML -> contabilizar uso
@@ -18,9 +19,9 @@ El integrador actualizado está incluido en este repositorio: [`docs/topic-autho
 
 Los botones de los campos 650 repetidos usan un único manejador de clics en el documento, que resuelve el campo desde el botón pulsado. Esto permite usar botones clonados por Koha sin depender de sus eventos originales ni de identificadores DOM únicos.
 
-El botón **Ampliar ventana / Restaurar tamaño** está en la cabecera del modal de Koha. La app recibe `existingMain`, `existingTerm`, `targetId` y `marcText` por `postMessage`. Consulta automáticamente los catálogos al abrir un 650 con texto y para cada propuesta generada; la generación de IA sigue requiriendo un clic. Comprueba el historial al mostrar propuestas de IA y nuevamente antes de transferirlas. El manejador de botones usa captura para evitar interferencias de eventos clonados; las importaciones incluyen el identificador del campo destino y se rechazan si ya cambió. Actualiza tanto la app como el integrador de IntranetUserJS. Para activar esta versión, reemplaza el integrador completo por la versión `20261027-mapping` de este repositorio después de desplegar el servidor; actualizar solo Render no cambia el código pegado en Koha.
+El botón **Ampliar ventana / Restaurar tamaño** está en la cabecera del modal de Koha. La app recibe `existingMain`, `existingTerm`, `targetId` y `marcText` por `postMessage`. Consulta automáticamente los catálogos al abrir un 650 con texto y para cada propuesta generada; la generación de IA sigue requiriendo un clic. Comprueba el historial al mostrar propuestas de IA y nuevamente antes de transferirlas. El manejador de botones usa captura para evitar interferencias de eventos clonados; las importaciones incluyen el identificador del campo destino y se rechazan si ya cambió. Actualiza tanto la app como el integrador de IntranetUserJS. Para activar esta versión, reemplaza el integrador completo por la versión `20261027-three-headings` de este repositorio después de desplegar el servidor; actualizar solo Render no cambia el código pegado en Koha.
 
-Las propuestas nuevas usan indicador 2 = `4` (fuente no especificada), sin URI ni código de autoridad inventados. Las subdivisiones se transfieren a sus subcampos, conservando el orden y las repeticiones. Si una propuesta repite un código como `650$x`, el integrador activa el control repetible de Koha y rellena la nueva ocurrencia automáticamente. Solo se detiene si el subcampo no está configurado como repetible en el framework. Los metadatos $0 y $2 son opcionales: se omiten si no hay editor disponible, sin impedir la importación del término. Si no se puede guardar el código de fuente en $2, el indicador 2 pasa de `7` a `4`.
+Las propuestas nuevas usan indicador 2 = `4` (fuente no especificada), sin URI ni código de autoridad inventados. Las subdivisiones se transfieren a sus subcampos, conservando el orden y las repeticiones. Si una propuesta repite un código como `650$x`, el integrador activa el control repetible de Koha y rellena la nueva ocurrencia automáticamente. Solo se detiene si el subcampo no está configurado como repetible en el framework. Los metadatos $0 y $2 son opcionales: se omiten si no hay editor disponible, sin impedir la importación del término. Las autoridades LCSH usan indicador 2 = `7` y `$2=lcsh` para llenar explícitamente «Fuente del encabezamiento o término» en Koha. Si no se puede guardar el código de fuente en $2, el indicador 2 pasa de `7` a `4`.
 
 La importación correcta al 650 guarda inmediatamente el tema en el historial mediante `POST /api/headings`, tanto para «Usar como nuevo» como para autoridades externas y formas recuperadas del historial. Se muestra una confirmación o un error con reintento. El tema ya puede recuperarse al buscar duplicados, aunque todavía no se haya guardado el registro de Koha. La selección no cuenta como uso bibliográfico. El integrador conserva provisionalmente la selección en la pestaña, detecta el envío del formulario y, al llegar a `detail.pl`, `MARCdetail.pl` o `additem.pl`, consulta el MARCXML guardado mediante `catalogue/export.pl?format=marcxml&op=export&bib=ID`. El parámetro `op=export` es obligatorio. Si falla la exportación o devuelve HTML, intenta `GET /api/v1/biblios/ID` con `Accept: application/marcxml+xml` y la sesión del staff. Ambas vías son de solo lectura; ninguna confirma usos si no devuelve un MARCXML válido. Solo sincroniza encabezamientos presentes en ese MARC. Un guardado repetido del mismo registro no suma usos; retirar un encabezamiento y guardar actualiza su contador. El contador representa **registros distintos que usan el encabezamiento**, no clics ni consultas. Los registros ajenos a este flujo y las eliminaciones completas desde otras pantallas no se sincronizan automáticamente.
 
@@ -107,7 +108,7 @@ Respuesta:
 }
 ```
 
-El ejemplo PDF está abreviado: `mode: "pdf"` devuelve cinco propuestas y omite `existingMain`, aunque se envíe. `mode: "marc"` devuelve un único encabezamiento con hasta dos subdivisiones en total; envía `existingMain` para conservar el 650$a. Si está vacío, se sugiere un encabezamiento nuevo. Las cinco propuestas son exclusivas del PDF. Por compatibilidad, omitir `mode` elige MARC si existe `existingMain`, o PDF en caso contrario. Si el modelo incumple la estructura, la app muestra un error para reintentar; no inventa propuestas para completar el cupo.
+El ejemplo PDF está abreviado: `mode: "pdf"` devuelve cinco propuestas y omite `existingMain`, aunque se envíe. `mode: "marc"` devuelve tres encabezamientos de materia distintos basados en los metadatos anteriores del registro. `existingMain` se usa únicamente como contexto y no obliga a conservar el 650$a actual. Cada propuesta puede incluir hasta dos subdivisiones. Por compatibilidad, omitir `mode` elige MARC si existe `existingMain`, o PDF en caso contrario. Si el modelo incumple la estructura o repite propuestas, la app muestra un error para reintentar; no inventa resultados para completar el cupo.
 
 Las generaciones idénticas se reutilizan durante cinco minutos (hasta 30 entradas en memoria), incluyendo solicitudes simultáneas. MARC solicita una respuesta más pequeña que PDF. La primera generación sigue dependiendo del tiempo de respuesta del proveedor; estas optimizaciones no eliminan latencia de red ni arranque del alojamiento.
 

@@ -29,16 +29,17 @@ test('imported topics persist immediately, deduplicate, and do not inflate confi
   await assert.rejects(reopened.rememberHeading({ main: '', subdivisions: [] }));
 });
 
-test('five proposals, typed subdivisions and preservation of existing 650$a', () => {
+test('five PDF proposals and three distinct MARC subject headings', () => {
   const raw = JSON.stringify(Array.from({ length: 5 }, () => heading));
-  const result = parseGeneratedHeadings(raw, 'EDUCACIÓN');
+  const result = parseGeneratedHeadings(raw);
   assert.equal(result.length, 5);
-  assert.equal(result[0].label, 'EDUCACIÓN -- México -- Bibliografías');
+  assert.equal(result[0].label, 'Educación -- México -- Bibliografías');
   assert.equal(result[0].subdivisions[0].code, 'z');
-  assert.throws(() => parseGeneratedHeadings(raw, 'Historia'));
   assert.throws(() => parseGeneratedHeadings(JSON.stringify([heading])));
-  assert.equal(parseGeneratedHeadings(JSON.stringify([heading]), 'Educación', 'marc').length, 1);
-  assert.throws(() => parseGeneratedHeadings(raw, 'Educación', 'marc'));
+  const marc = [heading, { main: 'Historia', subdivisions: [] }, { main: 'Escuelas', subdivisions: [{ code: 'x', value: 'Administración' }] }];
+  assert.equal(parseGeneratedHeadings(JSON.stringify(marc), 'Educación', 'marc').length, 3);
+  assert.throws(() => parseGeneratedHeadings(JSON.stringify([heading]), 'Educación', 'marc'));
+  assert.throws(() => parseGeneratedHeadings(JSON.stringify([heading, heading, heading]), 'Educación', 'marc'));
   assert.throws(() => validateHeading({ ...heading, subdivisions: [...heading.subdivisions, { code: 'x', value: 'Historia' }] }));
   assert.throws(() => validateHeading({ ...heading, subdivisions: [{ code: 'a', value: 'Incorrecto' }] }));
 });

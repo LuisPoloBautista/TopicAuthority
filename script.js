@@ -256,7 +256,8 @@ function renderTopics(headings, generated = false, output = document.getElementB
 function marcAuthority(item) {
   const source = String(item.source || "");
   const map = {
-    LCSH: { ind2: "0", sourceCode: "" },
+    // Use an explicit source code so Koha also fills 650$2 ("Fuente del encabezamiento o término").
+    LCSH: { ind2: "7", sourceCode: "lcsh" },
     BNE: { ind2: "7", sourceCode: "embne" },
     UNESCO: { ind2: "7", sourceCode: "unescot" },
     EuroVoc: { ind2: "7", sourceCode: "eurovoc" },
@@ -304,13 +305,15 @@ function receiveKohaContext(context, origin) {
   kohaContext = context || {};
   viewVersion++;
   const existing = String(kohaContext.existingMain || kohaContext.existingTerm?.split(/\s*--\s*/)[0] || '').trim();
-  analyzeKohaBtn.hidden = !String(kohaContext.marcText || '').trim();
-  analyzeKohaBtn.textContent = existing ? 'Sugerir hasta 2 subdivisiones' : 'Sugerir un encabezamiento desde MARC';
+  analyzeKohaBtn.hidden = !String(kohaContext.marcText || '').trim() && !existing;
+  analyzeKohaBtn.textContent = 'Generar 3 encabezamientos de materia';
   authorityTermInput.value = kohaContext.existingTerm || existing;
   updateCatalogLinks();
   output.textContent = 'Busca este encabezamiento o uno similar en el historial JSON.';
-  marcOutput.textContent = 'Aquí aparecerá un solo encabezamiento con hasta dos subdivisiones.';
-  kohaContextMessage.textContent = existing ? `650$a: ${existing}. Se conserva el encabezamiento principal y se sugieren hasta dos subdivisiones.` : '650$a vacío: se propondrá un solo encabezamiento con hasta dos subdivisiones.';
+  marcOutput.textContent = 'Aquí aparecerán tres encabezamientos de materia sugeridos.';
+  kohaContextMessage.textContent = existing
+    ? `650$a actual: ${existing}. Se usará como contexto junto con los metadatos anteriores, sin conservarlo obligatoriamente.`
+    : 'Se analizarán los metadatos anteriores del registro para proponer tres encabezamientos de materia.';
   if (existing) searchOneTopic(authorityTermInput.value.trim());
 }
 
@@ -328,7 +331,7 @@ async function analyzeText(sourceText, existingMain = "", mode = "marc", output 
   const version = viewVersion;
   const request = (requestsByOutput.get(output) || 0) + 1;
   requestsByOutput.set(output, request);
-  output.textContent = 'Preparando un encabezamiento con hasta dos subdivisiones desde MARC...';
+  output.textContent = 'Generando tres encabezamientos de materia desde los metadatos MARC...';
 
   try {
     const data = await requestTopics(sourceText, existingMain, mode);
@@ -348,7 +351,9 @@ async function analyzeText(sourceText, existingMain = "", mode = "marc", output 
 
 analyzeKohaBtn?.addEventListener("click", async () => {
   analyzeKohaBtn.disabled = true;
-  try { await analyzeText(String(kohaContext?.marcText || ''), String(kohaContext?.existingMain || kohaContext?.existingTerm?.split(/\s*--\s*/)[0] || ''), 'marc', marcOutput); }
+  const existingMain = String(kohaContext?.existingMain || kohaContext?.existingTerm?.split(/\s*--\s*/)[0] || '').trim();
+  const marcText = String(kohaContext?.marcText || '').trim() || (existingMain ? '=650  $a' + existingMain : '');
+  try { await analyzeText(marcText, existingMain, 'marc', marcOutput); }
   finally { analyzeKohaBtn.disabled = false; }
 });
 searchAuthorityBtn?.addEventListener("click", () => {

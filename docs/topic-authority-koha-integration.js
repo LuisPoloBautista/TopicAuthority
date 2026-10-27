@@ -6,7 +6,7 @@
   "use strict";
 
   const AUTHORITY_ORIGIN = "https://topicauthority.onrender.com";
-  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20261027-mapping";
+  const AUTHORITY_URL = AUTHORITY_ORIGIN + "/?koha=1&integration=20261027-three-headings";
   const CATALOGUING_PATH = "/cgi-bin/koha/cataloguing/addbiblio.pl";
   let authorityFrame = null;
   let target650Node = null;

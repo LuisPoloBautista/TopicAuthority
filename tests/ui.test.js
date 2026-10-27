@@ -28,8 +28,12 @@ function ui() {
     window, headingLabel, setTimeout, URL,
     fetch: async (url, options) => {
       requests.push({ url, options });
+      if (String(url).startsWith('/api/headings')) {
+        const headings = [{ main: 'Educación', subdivisions: [{ code: 'z', value: 'México' }], label: 'Educación -- México', uses: 1, records: [{ origin: 'https://koha.test', biblionumber: '42' }] }];
+        return { ok: true, json: async () => ({ headings }) };
+      }
       const mode = options?.body ? JSON.parse(options.body).mode : '';
-      const headings = Array.from({ length: mode === 'marc' ? 1 : 5 }, () => ({ main: 'Educación', subdivisions: [{ code: 'z', value: 'México' }], label: 'Educación -- México', uses: 1, records: [{ origin: 'https://koha.test', biblionumber: '42' }] }));
+      const headings = Array.from({ length: mode === 'marc' ? 3 : 5 }, (_, index) => ({ main: `Tema ${index + 1}`, subdivisions: [{ code: 'z', value: 'México' }], label: `Tema ${index + 1} -- México`, uses: 1, records: [{ origin: 'https://koha.test', biblionumber: '42' }] }));
       return { ok: true, json: async () => ({ headings, topics: headings.map(h => h.label) }) };
     }
   });
@@ -37,19 +41,29 @@ function ui() {
   return { nodes, context, requests, messages };
 }
 
-test('UI offers subdivision generation for an existing 650$a and heading generation for an empty one', async () => {
+test('UI generates three subject headings from preceding MARC metadata', async () => {
   const { nodes, context, requests } = ui();
   context.receiveKohaContext({ existingMain: 'Educación', existingTerm: 'Educación', marcText: '=245 $a Educación en México' }, 'https://koha.test');
-  assert.match(nodes.get('analyzeKohaBtn').textContent, /subdivisiones/);
+  assert.match(nodes.get('analyzeKohaBtn').textContent, /3 encabezamientos/);
   assert.equal(requests.length, 0);
   await nodes.get('analyzeKohaBtn').events.click();
   assert.equal(JSON.parse(requests[0].options.body).existingMain, 'Educación');
-  assert.equal((nodes.get('marcOutput').innerHTML.match(/class="topic-card"/g) || []).length, 1);
+  assert.equal((nodes.get('marcOutput').innerHTML.match(/class="topic-card"/g) || []).length, 3);
   assert.match(nodes.get('marcOutput').innerHTML, /catalog-results/);
   assert.match(nodes.get('output').innerHTML, /Educación/);
   context.receiveKohaContext({ existingMain: '', existingTerm: '', marcText: '=245 $a Historia' }, 'https://koha.test');
-  assert.match(nodes.get('analyzeKohaBtn').textContent, /un encabezamiento/);
+  assert.match(nodes.get('analyzeKohaBtn').textContent, /3 encabezamientos/);
   assert.equal(nodes.get('authorityTermInput').value, '');
+
+  context.receiveKohaContext({ existingMain: 'Organization Charts (NAID 2123823)', existingTerm: 'Organization Charts (NAID 2123823)', marcText: '' }, 'https://koha.test');
+  assert.equal(nodes.get('analyzeKohaBtn').hidden, false);
+  await nodes.get('analyzeKohaBtn').events.click();
+  const fallbackRequest = JSON.parse(requests.at(-1).options.body);
+  assert.equal(fallbackRequest.existingMain, 'Organization Charts (NAID 2123823)');
+  assert.match(fallbackRequest.text, /^=650  \$aOrganization Charts/);
+  const lcsh = context.marcAuthority({ source: 'LCSH', label: 'Organization charts', uri: 'http://id.loc.gov/authorities/subjects/sh85095525' });
+  assert.equal(lcsh.ind2, '7');
+  assert.equal(lcsh.sourceCode, 'lcsh');
 });
 
 test('automatic history warning imports typed MARC data without recording a use', async () => {

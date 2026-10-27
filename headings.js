@@ -31,6 +31,12 @@ export function headingKey(heading) {
 
 export function parseGeneratedHeadings(raw, existingMain = '', mode = 'pdf') {
   const parsed = JSON.parse(String(raw).trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, ''));
+  if (mode === 'marc') {
+    if (!Array.isArray(parsed) || parsed.length !== 3) throw new Error('La IA debe devolver tres encabezamientos. Vuelve a intentarlo.');
+    const headings = parsed.map(validateHeading);
+    if (new Set(headings.map(headingKey)).size !== 3) throw new Error('La IA debe devolver tres encabezamientos diferentes. Vuelve a intentarlo.');
+    return headings;
+  }
   const count = mode === 'pdf' ? 5 : 1;
   if (!Array.isArray(parsed) || parsed.length !== count) throw new Error(`La IA debe devolver ${count} encabezamiento(s). Vuelve a intentarlo.`);
   const headings = parsed.map(validateHeading);

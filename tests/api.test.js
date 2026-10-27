@@ -23,7 +23,8 @@ test('API generates typed headings and counts confirmed records only', async t =
     }
     generations++;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ output_text: JSON.stringify(Array.from({ length: prompt.includes('UN solo') ? 1 : 5 }, () => h)) }));
+    const count = prompt.includes('TRES encabezamientos') ? 3 : 5;
+    res.end(JSON.stringify({ output_text: JSON.stringify(Array.from({ length: count }, (_, index) => ({ ...h, main: `Tema ${index + 1}` }))) }));
   }).listen(0, '127.0.0.1');
   await once(mock, 'listening');
   const server = spawn(process.execPath, ['server.js'], {
@@ -50,8 +51,9 @@ test('API generates typed headings and counts confirmed records only', async t =
   const marcRequest = { text: '=245 $a Educación en México', existingMain: 'Educación', mode: 'marc' };
   const generated = await post('/api/topics', marcRequest);
   assert.equal(generated.status, 200);
-  assert.equal((await generated.json()).headings.length, 1);
-  assert.match(prompt, /Conserva literalmente/);
+  assert.equal((await generated.json()).headings.length, 3);
+  assert.match(prompt, /TRES encabezamientos de materia/);
+  assert.doesNotMatch(prompt, /Conserva literalmente/);
   await post('/api/topics', marcRequest);
   assert.equal(generations, 1);
   const pdf = await post('/api/topics', { ...marcRequest, mode: 'pdf' });

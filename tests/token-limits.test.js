@@ -28,8 +28,8 @@ test('input token limits and single-attempt OpenAI requests', async t => {
     }
     res.setHeader('Content-Type', 'application/json');
     if (stage === 'count') return res.end(JSON.stringify({ input_tokens: typeof countedTokens === 'function' ? countedTokens(request) : countedTokens }));
-    const isMarc = request.input[0].content[0].text.includes('UN solo');
-    res.end(JSON.stringify({ output_text: JSON.stringify(Array.from({ length: isMarc ? 1 : 5 }, () => ({ main: 'Educación', subdivisions: [] }))) }));
+    const isMarc = request.input[0].content[0].text.includes('TRES encabezamientos');
+    res.end(JSON.stringify({ output_text: JSON.stringify(Array.from({ length: isMarc ? 3 : 5 }, (_, index) => ({ main: `Tema ${index + 1}`, subdivisions: [] }))) }));
   }).listen(0, '127.0.0.1');
   await once(mock, 'listening');
   const server = spawn(process.execPath, ['server.js'], {
@@ -69,7 +69,7 @@ test('input token limits and single-attempt OpenAI requests', async t => {
         const result = await response.json();
         if (tokens > limit) {
           assert.equal(response.status, 200);
-          assert.equal(result.headings.length, mode === 'marc' ? 1 : 5);
+          assert.equal(result.headings.length, mode === 'marc' ? 3 : 5);
           assert.equal(result.error, undefined);
           const generated = calls.filter(c => c.stage === 'generate');
           assert.equal(generated.length, 1);
@@ -79,15 +79,15 @@ test('input token limits and single-attempt OpenAI requests', async t => {
           assert.ok(prefix.length > 0 && prefix.length < input.text.length);
         } else {
           assert.equal(response.status, 200);
-          assert.equal(result.headings.length, mode === 'marc' ? 1 : 5);
+          assert.equal(result.headings.length, mode === 'marc' ? 3 : 5);
           assert.deepEqual(calls.map(c => c.stage), ['count', 'generate']);
           assert.deepEqual(calls[0].request.input, calls[1].request.input);
           assert.equal(calls[0].request.model, calls[1].request.model);
-          assert.equal(calls[1].request.max_output_tokens, output);
+          assert.equal(calls[1].request.max_output_tokens, mode === 'marc' ? 1800 : output);
           const prompt = calls[0].request.input[0].content[0].text;
           assert.ok(prompt.endsWith(input.text));
           assert.match(prompt, /Eres un catalogador bibliotecario/);
-          if (mode === 'marc') assert.match(prompt, /Conserva literalmente este 650\$a/);
+          if (mode === 'marc') assert.match(prompt, /TRES encabezamientos de materia/);
           else assert.doesNotMatch(prompt, /Conserva literalmente/);
         }
       });
